@@ -1,0 +1,206 @@
+/* Layout principal */
+.ds-root {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* Sidebar */
+.ds-sidebar {
+  width: 220px;
+  min-width: 220px;
+  background: var(--color-blue-900);
+  color: var(--color-white);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.ds-sidebar-brand {
+  padding: var(--space-6);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.ds-logo {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  font-family: var(--font-family);
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: var(--color-white);
+}
+
+.ds-logo-bar {
+  display: inline-block;
+  width: 14px;
+  height: 4px;
+  background: var(--color-brand-primary);
+  margin: 0 3px;
+  border-radius: 2px;
+}
+
+.ds-logo-tag {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-neutral-400);
+  margin-top: var(--space-1);
+}
+
+.ds-nav {
+  flex: 1;
+  padding: var(--space-4) 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ds-nav-link {
+  padding: var(--space-2) var(--space-6);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-white);
+  transition: all var(--duration-fast) var(--ease-default);
+  border-left: 2px solid transparent;
+}
+
+.ds-nav-link:hover {
+  color: var(--color-white);
+  background: rgba(255,255,255,0.06);
+  border-left-color: var(--color-brand-primary);
+}
+
+.ds-sidebar-footer {
+  padding: var(--space-4) var(--space-6);
+  font-size: 11px;
+  color: rgba(255,255,255,0.3);
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+/* Main */
+.ds-main {
+  flex: 1;
+  overflow-x: hidden;
+  background: #FFFFFF;
+}
+
+/* Header */
+.ds-header {
+  background: var(--color-brand-primary);
+  color: var(--color-white);
+  padding: var(--space-20) var(--space-12);
+}
+
+.ds-header-logo-img {
+  height: 80px;
+  display: block;
+  margin-bottom: var(--space-6);
+}
+
+.ds-header-logo {
+  font-family: var(--font-family);
+  font-size: 96px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: var(--space-6);
+}
+
+.ds-header-bar {
+  display: inline-block;
+  width: 80px;
+  height: 10px;
+  background: var(--color-white);
+  margin: 0 8px;
+  border-radius: 4px;
+}
+
+.ds-header-tag {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  opacity: 0.9;
+  margin-bottom: var(--space-2);
+}
+
+.ds-header-desc {
+  font-size: 14px;
+  font-weight: 400;
+  opacity: 0.6;
+  letter-spacing: 0.04em;
+}
+
+/* Seções */
+.ds-section {
+  padding: var(--space-12);
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+
+.ds-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-brand-primary);
+  margin-bottom: var(--space-2);
+}
+
+.ds-section-heading {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-8);
+}
+
+.ds-subsection {
+  margin-bottom: var(--space-10);
+}
+
+.ds-subsection-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-4);
+}
+
+/* Token chip */
+.ds-token {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--color-neutral-100);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--duration-fast);
+}
+.ds-token:hover { background: var(--color-blue-50); color: var(--color-brand-primary); }
+
+/* Grid helpers */
+.ds-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-4); }
+.ds-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
+.ds-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); }
+
+@media (max-width: 900px) {
+  .ds-sidebar { display: none; }
+  .ds-grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .ds-grid-3 { grid-template-columns: repeat(2, 1fr); }
+  .ds-header { padding: var(--space-10) var(--space-6); }
+  .ds-header-logo { font-size: 56px; }
+  .ds-section { padding: var(--space-8) var(--space-6); }
+}
