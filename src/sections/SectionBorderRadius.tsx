@@ -16,7 +16,7 @@ export default function SectionBorderRadius() {
         Arestas arredondadas contrastam com as linhas retas do logotipo.
       </p>
 
-      <div style={{ display: 'flex', gap: 'var(--space-6)', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-6)', flexWrap: 'wrap', alignItems: 'flex-start' }}>
         {RADII.map(r => (
           <div key={r.token} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)' }}>
             <div style={{

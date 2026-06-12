@@ -1,73 +1,70 @@
-# React + TypeScript + Vite
+# NAWA Design System
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Sistema de design oficial da **NAWA Health** — plataforma personalizada de saúde contínua que conecta pessoas a protocolos de saúde e médicos reais.
 
-Currently, two official plugins are available:
+## Sobre a NAWA
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+NAWA é uma plataforma digital de saúde que oferece protocolos personalizados contínuos, acompanhamento médico e gestão de bem-estar. A marca é construída sobre cinco pilares:
 
-## React Compiler
+| Pilar | Símbolo |
+|---|---|
+| Recuperação | + estilizado |
+| Força | duplo chevron |
+| Energia | seta circular |
+| Foco | quadrado com detalhe |
+| Longevidade | infinito |
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+A identidade visual é centrada no espaço entre as letras **NA** e **WA** — chamado de *portal* — que pode receber cor sólida, tagline, imagem ou vazio expandido.
 
-## Expanding the ESLint configuration
+> *"A barra entre NA e WA é o portal — o espaço onde a marca coloca o mundo."*
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Sobre o projeto
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Este repositório é o **Design System** da NAWA, documentando todos os tokens, componentes e diretrizes visuais do produto digital.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### O que está documentado
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| # | Seção | Conteúdo |
+|---|---|---|
+| 01 | Cores | Paleta de marca, escala de azul, neutros e cores semânticas |
+| 02 | Tipografia | Escala completa com AT Aero (fallback: Poppins) |
+| 03 | Espaçamento | Grid baseado em múltiplos de 4pt |
+| 04 | Raio de borda | 6 níveis de arredondamento |
+| 05 | Elevação & Sombra | 4 níveis de sombra + Liquid Glass |
+| 06 | Motion | Durações e curvas de easing |
+| 07 | Botões | Variantes, tamanhos, estados e ícones |
+| 08 | Inputs | Campos, select, textarea e floating label |
+| 09 | Progress & Steps | Barras de progresso, step indicator, radio e checkbox |
+| 10 | Cards | Variantes de card e seleção de plano |
+| 11 | Navegação | Top nav (solid e brand) e bottom navigation mobile |
+| 12 | Toasts | Notificações de sucesso, erro, alerta e informação |
+| 13 | Brand Assets | Assinaturas validadas, ícones de pilar e asset diagonal |
+| 14 | Acessibilidade | Contraste WCAG AA, focus visible e touch targets |
+
+## Identidade visual
+
+- **Cor primária:** Azul NAWA `#204FF1`
+- **Cor escura:** Azul Escuro `#0619AD`
+- **Tipografia:** AT Aero (Arilla Type Studio) — Black 900 para display
+- **Princípio estético:** sólidos, sem gradientes, espaço como elemento de design
+
+## Stack
+
+- [React 19](https://react.dev/)
+- [TypeScript 6](https://www.typescriptlang.org/)
+- [Vite 8](https://vite.dev/)
+- [React Router 7](https://reactrouter.com/)
+
+## Como rodar
+
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Acesse `http://localhost:5173` para ver o Design System.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run build   # build de produção
+npm run preview # preview do build
 ```

@@ -37,32 +37,18 @@ export default function SectionElevation() {
       {/* Liquid Glass */}
       <div style={{ marginTop: 'var(--space-10)' }}>
         <div className="ds-subsection-label">Liquid Glass</div>
-        <div style={{ background: 'var(--color-brand-primary)', padding: 'var(--space-8)', borderRadius: 'var(--radius-xl)', display: 'flex', gap: 'var(--space-6)' }}>
-          <div style={{
-            background: 'rgba(255,255,255,0.12)',
-            border: '1px solid rgba(255,255,255,0.20)',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-            borderRadius: 'var(--radius-lg)',
-            padding: 'var(--space-6)',
-            color: '#fff',
-            flex: 1,
-          }}>
-            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 4 }}>GLASS ELEMENT</div>
-            <div style={{ fontSize: 13, opacity: 0.8 }}>--glass-bg: rgba(255,255,255,0.12)</div>
+        <div className="liquid-glass-scene">
+          <div className="liquid-glass">
+            <div className="liquid-glass-content">
+              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 4 }}>GLASS ELEMENT</div>
+              <div style={{ fontSize: 13, opacity: 0.7 }}>Bordas com blur · centro transparente</div>
+            </div>
           </div>
-          <div style={{
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.12)',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-            borderRadius: 'var(--radius-lg)',
-            padding: 'var(--space-6)',
-            color: '#fff',
-            flex: 1,
-          }}>
-            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 4 }}>GLASS SUBTLE</div>
-            <div style={{ fontSize: 13, opacity: 0.8 }}>Variação mais sutil</div>
+          <div className="liquid-glass">
+            <div className="liquid-glass-content">
+              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 4 }}>GLASS SUBTLE</div>
+              <div style={{ fontSize: 13, opacity: 0.7 }}>Mesmo princípio · variação de contexto</div>
+            </div>
           </div>
         </div>
       </div>

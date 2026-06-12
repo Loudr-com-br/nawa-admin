@@ -15,6 +15,7 @@ import SectionNavigation from '../sections/SectionNavigation'
 import SectionToasts from '../sections/SectionToasts'
 import SectionBrandAssets from '../sections/SectionBrandAssets'
 import SectionAccessibility from '../sections/SectionAccessibility'
+import SectionTokens from '../sections/SectionTokens'
 
 const NAV = [
   { id: 'colors',       label: 'Cores' },
@@ -31,6 +32,7 @@ const NAV = [
   { id: 'toasts',       label: 'Toasts' },
   { id: 'brand-assets', label: 'Brand Assets' },
   { id: 'a11y',         label: 'Acessibilidade' },
+  { id: 'tokens',       label: 'Export Tokens' },
 ]
 
 export default function DesignSystem() {
@@ -78,6 +80,7 @@ export default function DesignSystem() {
         <SectionToasts />
         <SectionBrandAssets />
         <SectionAccessibility />
+        <SectionTokens />
       </main>
     </div>
   )

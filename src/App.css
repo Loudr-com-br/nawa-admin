@@ -196,6 +196,71 @@
 .ds-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
 .ds-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); }
 
+/* Liquid Glass */
+.liquid-glass-scene {
+  position: relative;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  min-height: 200px;
+  display: flex;
+  gap: var(--space-6);
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-10) var(--space-8);
+  background: var(--color-brand-primary);
+}
+
+.liquid-glass {
+  --lg-radius: 20px;
+  position: relative;
+  border-radius: var(--lg-radius);
+  background-color: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  padding: var(--space-6);
+  flex: 1;
+}
+
+.liquid-glass::before {
+  --expand: 14px;
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: var(--lg-radius);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  pointer-events: none;
+  mask-image:
+    linear-gradient(to bottom, #000 0, #000 2px, transparent var(--expand)),
+    linear-gradient(to left,   #000 0, #000 2px, transparent var(--expand)),
+    linear-gradient(to top,    #000 0, #000 2px, transparent var(--expand)),
+    linear-gradient(to right,  #000 0, #000 2px, transparent var(--expand));
+  -webkit-mask-image:
+    linear-gradient(to bottom, #000 0, #000 2px, transparent var(--expand)),
+    linear-gradient(to left,   #000 0, #000 2px, transparent var(--expand)),
+    linear-gradient(to top,    #000 0, #000 2px, transparent var(--expand)),
+    linear-gradient(to right,  #000 0, #000 2px, transparent var(--expand));
+  mask-composite: add;
+  -webkit-mask-composite: source-over;
+}
+
+.liquid-glass::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  z-index: 1;
+  border-top: 1px solid rgba(255, 255, 255, 0.5);
+  border-left: 1px solid rgba(255, 255, 255, 0.5);
+  filter: blur(1px);
+  border-radius: var(--lg-radius);
+  pointer-events: none;
+}
+
+.liquid-glass-content {
+  position: relative;
+  z-index: 2;
+}
+
 @media (max-width: 900px) {
   .ds-sidebar { display: none; }
   .ds-grid-4 { grid-template-columns: repeat(2, 1fr); }
