@@ -1,10 +1,7 @@
-import ModulePlaceholder from "@/components/ModulePlaceholder";
+import { listForms } from "@/lib/anamnesis/queries";
+import AnamnesisClient from "./AnamnesisClient";
 
-export default function Page() {
-  return (
-    <ModulePlaceholder
-      title="Anamnese"
-      description="Construtor multi-step: perguntas, lógica condicional, score de risco e perfil metabólico. Renderizada pelo front."
-    />
-  );
+export default async function AnamnesisPage() {
+  const forms = await listForms();
+  return <AnamnesisClient forms={forms} />;
 }

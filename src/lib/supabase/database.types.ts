@@ -48,7 +48,9 @@ export type Database = {
           form_id: string
           id: string
           label: string
+          options: Json
           order: number
+          required: boolean
           risk_weight: number
           type: string
           updated_at: string
@@ -59,7 +61,9 @@ export type Database = {
           form_id: string
           id?: string
           label: string
+          options?: Json
           order?: number
+          required?: boolean
           risk_weight?: number
           type?: string
           updated_at?: string
@@ -70,7 +74,9 @@ export type Database = {
           form_id?: string
           id?: string
           label?: string
+          options?: Json
           order?: number
+          required?: boolean
           risk_weight?: number
           type?: string
           updated_at?: string
