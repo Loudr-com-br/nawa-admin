@@ -60,7 +60,7 @@ const TOKENS = {
     full: { $value: '9999px', $type: 'dimension' },
   },
   typography: {
-    fontFamily: { $value: 'AT Aero, Poppins, sans-serif', $type: 'fontFamily' },
+    fontFamily: { $value: 'AT Aero, sans-serif', $type: 'fontFamily' },
     fontWeight: {
       regular:   { $value: '400', $type: 'fontWeight' },
       semibold:  { $value: '600', $type: 'fontWeight' },

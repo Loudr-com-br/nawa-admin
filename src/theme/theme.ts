@@ -7,8 +7,12 @@ import { colors, radius, shadows } from "./tokens";
  * Tema MUI da NAWA, derivado dos tokens do Design System.
  * Light-first (visão primária). Dark será adicionado por acessibilidade depois.
  */
+// AT Aero (auto-hospedada via next/font/local) expõe a variável --font-ataero,
+// que já inclui a cadeia de fallback sans-serif definida em src/app/fonts.ts.
+// O `sans-serif` extra no var() protege o caso da variável ausente, garantindo
+// que o fallback nunca seja serifa (Times).
 const fontFamily =
-  '"AT Aero", var(--font-poppins), "Poppins", -apple-system, sans-serif';
+  'var(--font-ataero, sans-serif), -apple-system, sans-serif';
 
 export const theme = createTheme({
   cssVariables: true,

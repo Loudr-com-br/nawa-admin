@@ -1,9 +1,5 @@
-/* AT Aero — fonte oficial da marca (licença: arillatype.studio)
-@font-face { font-family:'AT Aero'; src:url('/fonts/ATAero-Black.woff2') format('woff2'); font-weight:900; }
-@font-face { font-family:'AT Aero'; src:url('/fonts/ATAero-Bold.woff2') format('woff2'); font-weight:700; }
-@font-face { font-family:'AT Aero'; src:url('/fonts/ATAero-SemiBold.woff2') format('woff2'); font-weight:600; }
-@font-face { font-family:'AT Aero'; src:url('/fonts/ATAero-Regular.woff2') format('woff2'); font-weight:400; }
-*/
+/* AT Aero (fonte oficial da marca) é carregada via next/font/local em
+   src/app/fonts.ts e exposta na variável CSS --font-ataero. */
 
 :root {
   /* Marca */
@@ -99,7 +95,7 @@
   --ease-out:     cubic-bezier(0, 0, 0.2, 1);
 
   /* Tipografia */
-  --font-family: 'AT Aero', 'Poppins', sans-serif;
+  --font-family: var(--font-ataero, sans-serif), -apple-system, sans-serif;
 
   /* Touch */
   --touch-target-min: 44px;
@@ -107,4 +103,7 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
+/* Garante fallback sem serifa no nível do documento (pré-hidratação, telas de
+   erro), independente do carregamento da fonte da marca. */
+body { font-family: var(--font-family); }
 a { color: inherit; text-decoration: none; }

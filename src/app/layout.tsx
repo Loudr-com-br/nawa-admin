@@ -1,15 +1,8 @@
 import type { Metadata } from "next";
-import { Poppins } from "next/font/google";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import ThemeRegistry from "@/theme/ThemeRegistry";
+import { atAero } from "./fonts";
 import "./globals.css";
-
-const poppins = Poppins({
-  subsets: ["latin"],
-  weight: ["400", "600", "700", "900"],
-  variable: "--font-poppins",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "NAWA Backoffice",
@@ -23,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR" className={poppins.variable}>
+    <html lang="pt-BR" className={atAero.variable}>
       <body>
         <AppRouterCacheProvider options={{ key: "mui" }}>
           <ThemeRegistry>{children}</ThemeRegistry>

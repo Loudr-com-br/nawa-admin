@@ -32,7 +32,7 @@ export default function SectionTypography() {
 
       <div style={{ marginBottom: 'var(--space-6)', padding: 'var(--space-4)', background: 'var(--color-blue-50)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-blue-200)' }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-brand-primary)' }}>Fonte principal: AT Aero (Arilla Type Studio) — </span>
-        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Fallback: Poppins. Carregar AT Aero via licença em arillatype.studio.</span>
+        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Auto-hospedada via next/font/local. Fallback: sans-serif do sistema.</span>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
