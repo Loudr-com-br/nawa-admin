@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Box from "@mui/material/Box";
 import Grid from "@mui/material/Grid2";
 import Card from "@mui/material/Card";
@@ -63,12 +63,22 @@ function inRange(o: DashOrder, from: number, to: number) {
 
 export default function DashboardClient({ data }: { data: DashboardData }) {
   const [period, setPeriod] = useState<Period>("30d");
+  // "Agora" ancorado no relógio real (client-only, evita mismatch de hidratação).
+  const [now, setNow] = useState<number | null>(null);
+  const [updatedAt, setUpdatedAt] = useState("");
+  useEffect(() => {
+    const tick = () => {
+      setNow(Date.now());
+      setUpdatedAt(new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date()));
+    };
+    tick();
+    const id = setInterval(tick, 60000);
+    return () => clearInterval(id);
+  }, []);
 
   const view = useMemo(() => {
     const orders = data.orders;
-    const refNow = orders.length
-      ? Math.max(...orders.map((o) => new Date(o.createdAt).getTime()))
-      : Date.now();
+    const refNow = now ?? Date.now();
     const days = periodDays[period];
     const span = days * 86400000;
     const from = refNow - span;
@@ -155,7 +165,7 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
       pendingPayment: curr.filter((o) => o.paymentStatus === "pending").length,
       labels, countSeries, revSeries, topProducts, topMax, funnel,
     };
-  }, [data.orders, period]);
+  }, [data.orders, period, now]);
 
   return (
     <Box>
@@ -163,9 +173,10 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={2} sx={{ mb: 2.5 }}>
         <Typography variant="h4" component="h1">Visão geral</Typography>
         <Stack direction="row" spacing={2} alignItems="center">
-          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: "success.main" }}>
-            <FiberManualRecordRoundedIcon sx={{ fontSize: 10 }} />
-            <Typography variant="caption" sx={{ fontWeight: 600 }}>Em tempo real</Typography>
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            <FiberManualRecordRoundedIcon sx={{ fontSize: 10, color: "success.main" }} />
+            <Typography variant="caption" sx={{ fontWeight: 600, color: "success.main" }}>Em tempo real</Typography>
+            {updatedAt && <Typography variant="caption" color="text.secondary">· Atualizado {updatedAt}</Typography>}
           </Stack>
           <TextField select size="small" label="Período" value={period} onChange={(e) => setPeriod(e.target.value as Period)} sx={{ minWidth: 140 }}>
             {(Object.keys(periodLabels) as Period[]).map((p) => <MenuItem key={p} value={p}>{periodLabels[p]}</MenuItem>)}
