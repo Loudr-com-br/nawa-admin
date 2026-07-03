@@ -1,10 +1,7 @@
-import ModulePlaceholder from "@/components/ModulePlaceholder";
+import { listProtocols } from "@/lib/protocols/queries";
+import ProtocolsClient from "./ProtocolsClient";
 
-export default function Page() {
-  return (
-    <ModulePlaceholder
-      title="Protocolos"
-      description="Engine clínica: CRUD de protocolos e fórmulas, formas farmacêuticas, prescription blocks, elegibilidade e fornecedor."
-    />
-  );
+export default async function ProtocolsPage() {
+  const protocols = await listProtocols();
+  return <ProtocolsClient protocols={protocols} />;
 }

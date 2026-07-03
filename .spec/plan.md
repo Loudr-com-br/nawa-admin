@@ -3,7 +3,7 @@
 > Documento vivo. Atualizar conforme avançamos.
 > Ordem de construção baseada na seção 11 do [`spec.md`](spec.md).
 >
-> **Última atualização:** 2026-07-03 (Catálogo com publish model em dados reais)
+> **Última atualização:** 2026-07-03 (Protocolos/fórmulas com ponte GLP-1 em dados reais)
 
 ## Legenda
 
@@ -64,9 +64,9 @@ A taxonomia precede o catálogo.
 
 ### 4. Protocolos e fórmulas (`/protocols`) — §5.6
 Módulo mais estratégico.
-- [ ] CRUD de protocolos com múltiplas fórmulas
-- [ ] Formas farmacêuticas, prescription blocks, elegibilidade
-- [ ] Fornecedor por fórmula + **ponte do GLP-1** (magistral Botane / original parceiro)
+- [x] CRUD de protocolos (lista + detalhe) com múltiplas fórmulas, publish model e origem Botane
+- [x] Fórmulas: formas farmacêuticas, dosagem, elegibilidade, fornecedor + **ponte do GLP-1**
+- [ ] Prescription blocks configuráveis (fase seguinte)
 
 ### 5. Anamnese (`/anamnesis`) — §5.7
 - [ ] Construtor multi-step
@@ -133,4 +133,5 @@ Módulo mais estratégico.
 - **2026-07-02** — Supabase ativado via CLI: projeto "Nawa DB" linkado, `.env.local` configurado (segredos fora do git), 3 migrations aplicadas (schema/RBAC/RLS), tipos TS gerados, clients tipados. Proteção de rotas confirmada (307 → /login). Script `scripts/seed-admin.mjs` pronto. **Falta**: criar o 1º usuário no Auth e rodar `npm run seed:admin`.
 - **2026-07-02** — Vertical slice completo em dados reais: super admin criado, seed de dados (16 pedidos), **Pedidos** (lista+detalhe) e **Nomenclatura/Atributos** (CRUD) ligados ao Supabase. Login split-screen na identidade NAWA + `/auth/confirm`. Padrões estabelecidos: server-fetch→client-table e formulário CRUD via Server Actions. Validado logado no navegador.
 - **2026-07-02** — Marco commitado e enviado à branch `dev`. `node_modules` destrackado; `.gitignore` reforçado (env, xlsx/pdf, supabase temp). Repo remoto mudou p/ `Loudr-com-br/nawa-front`.
-- **2026-07-03** — **Catálogo** (`/catalog`): abas Planos/Produtos, CRUD via Server Actions e **publish model** (rascunho/publicado) com `PublishStatusChip`. Migration `commercial_products.ref_id` anulável (add-ons). Validado criando add-on em rascunho.
+- **2026-07-03** — **Catálogo** (`/catalog`): abas Planos/Produtos, CRUD via Server Actions e **publish model** (rascunho/publicado) com `PublishStatusChip`. Migration `commercial_products.ref_id` anulável (add-ons). Validado criando add-on em rascunho. Commitado na `dev`.
+- **2026-07-03** — **Protocolos** (`/protocols`): lista + detalhe (`/protocols/[id]`) com CRUD de fórmulas, formas farmacêuticas, fornecedor, elegibilidade e **ponte GLP-1** (magistral Botane / original parceiro). Publish toggle no cabeçalho. Validado adicionando fórmula ao vivo.
