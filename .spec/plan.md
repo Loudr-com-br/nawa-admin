@@ -3,7 +3,7 @@
 > Documento vivo. Atualizar conforme avançamos.
 > Ordem de construção baseada na seção 11 do [`spec.md`](spec.md).
 >
-> **Última atualização:** 2026-07-03 (Dashboard real — 12 módulos de núcleo prontos)
+> **Última atualização:** 2026-07-03 (Configuração de sistema — usuários e papéis)
 
 ## Legenda
 
@@ -91,7 +91,8 @@ Módulo mais estratégico.
 
 ### 9. Botane — saída + Configuração de sistema — §5.13 / §9.1
 - [ ] Envio do pedido para produção (direção `order`)
-- [ ] Usuários internos, papéis, integrações, parâmetros
+- [x] Configuração (`/settings`): usuários internos + papéis (convidar, trocar papel, ativar/desativar) — restrito ao super_admin; aba de integrações (informativa)
+- [ ] Integrações editáveis + parâmetros de ambiente
 
 ### 10. Pacientes e Assinaturas — §5.3 / §5.4
 - [x] Pacientes: lista + ficha 360º (cadastro, assinaturas, histórico de pedidos, status clínico)
@@ -144,4 +145,5 @@ Módulo mais estratégico.
 - **2026-07-03** — **Storefront API + Chaves** (`/api-keys`): endpoints `/api/storefront/{catalog,protocols,anamnesis}` autenticados por chave (hash sha256, header Bearer), servindo só `published`; client admin server-only; `last_used_at`. Módulo de chaves: criar (revela uma vez), rotacionar, revogar, prefixo mascarado. Migration `api_keys.key_prefix`. Validado: 401 sem chave, dados só publicados com chave; produto rascunho corretamente omitido. Commitado na `dev`.
 - **2026-07-03** — **Promoções** (`/promotions`): CRUD de cupons (código, percentual/valor fixo, valor, período de vigência com estado ativa/agendada/expirada, publish). Validado criando RESET10 (10%, publicado). Commitado na `dev`.
 - **2026-07-03** — **Assinaturas** (`/subscriptions`): lista + operações (pausar/reativar/retentar/cancelar/mudar plano) via Server Actions, filtro por status. Seed de 16 assinaturas (`npm run seed:subscriptions`). **Pacientes** (`/patients`): lista + ficha 360º (`/patients/[id]`) agregando cadastro, assinaturas, histórico de pedidos e status clínico. Validado pausando assinatura e abrindo ficha. Commitado na `dev`.
-- **2026-07-03** — **Dashboard** (`/dashboard`): métricas reais agregadas do Supabase (16 pedidos, 9 assinaturas ativas, MRR R$ 4.510, 16 pacientes), lista de pedidos recentes clicável e card de alertas (inadimplentes + sync Botane). Fecha os 12 módulos de núcleo do spec em dados reais.
+- **2026-07-03** — **Dashboard** (`/dashboard`): métricas reais agregadas do Supabase (16 pedidos, 9 assinaturas ativas, MRR R$ 4.510, 16 pacientes), lista de pedidos recentes clicável e card de alertas (inadimplentes + sync Botane). Fecha os 12 módulos de núcleo do spec em dados reais. Commitado na `dev`.
+- **2026-07-03** — **Configuração** (`/settings`): gestão de usuários internos e papéis (convidar cria auth user + users_internal, trocar papel, ativar/desativar), restrito ao super_admin (guard na página + nas actions). Aba de integrações informativa. Validado convidando medico.teste@nawahealth.com como Médico.
