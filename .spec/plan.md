@@ -3,7 +3,7 @@
 > Documento vivo. Atualizar conforme avançamos.
 > Ordem de construção baseada na seção 11 do [`spec.md`](spec.md).
 >
-> **Última atualização:** 2026-07-03 (Jornadas com planos e conteúdo)
+> **Última atualização:** 2026-07-03 (Storefront API + chaves)
 
 ## Legenda
 
@@ -80,9 +80,10 @@ Módulo mais estratégico.
 - [x] Publish model; estrutura pronta para jornadas futuras
 
 ### 7. Storefront API + chaves (`/api-keys`) — §5.12 / §9.2
-- [ ] Contrato de leitura (só `status = published`)
-- [ ] Geração/revogação/rotação de chaves (hash, escopo leitura)
-- [ ] Endpoints em Netlify Functions validando a chave
+- [x] Contrato de leitura (`/api/storefront/{catalog,protocols,anamnesis}`) — só `status = published`
+- [x] Geração/revogação/rotação de chaves (guardadas como hash, escopo leitura, `last_used_at`)
+- [x] Endpoints (Route Handlers) validando a chave via header Bearer; middleware libera a rota
+- [ ] Mover para Netlify Functions no deploy (hoje Route Handlers do Next servem o mesmo contrato)
 
 ### 8. Promoções (`/promotions`) — §5.10
 - [ ] Cupons, descontos por período, regras de preço
@@ -138,4 +139,5 @@ Módulo mais estratégico.
 - **2026-07-03** — **Catálogo** (`/catalog`): abas Planos/Produtos, CRUD via Server Actions e **publish model** (rascunho/publicado) com `PublishStatusChip`. Migration `commercial_products.ref_id` anulável (add-ons). Validado criando add-on em rascunho. Commitado na `dev`.
 - **2026-07-03** — **Protocolos** (`/protocols`): lista + detalhe (`/protocols/[id]`) com CRUD de fórmulas, formas farmacêuticas, fornecedor, elegibilidade e **ponte GLP-1** (magistral Botane / original parceiro). Publish toggle no cabeçalho. Validado adicionando fórmula ao vivo. Commitado na `dev`.
 - **2026-07-03** — **Anamnese** (`/anamnesis`): form builder completo — lista + `/anamnesis/[id]` com CRUD de perguntas (tipos, opções, obrigatoriedade, reordenação), lógica condicional e score de risco. Migration `anamnesis_questions` (options/required). Seed de formulário com 10 perguntas (`npm run seed:anamnesis`). Commitado na `dev`.
-- **2026-07-03** — **Jornadas** (`/journeys`): lista + detalhe com vínculo/desvínculo de planos e edição de conteúdo (tagline/descrição/destaques em jsonb), publish toggle. Fix: campos multiline com `rows` fixo (evita loop do TextareaAutosize do MUI + React 19).
+- **2026-07-03** — **Jornadas** (`/journeys`): lista + detalhe com vínculo/desvínculo de planos e edição de conteúdo (tagline/descrição/destaques em jsonb), publish toggle. Fix: campos multiline com `rows` fixo (evita loop do TextareaAutosize do MUI + React 19). Commitado na `dev`.
+- **2026-07-03** — **Storefront API + Chaves** (`/api-keys`): endpoints `/api/storefront/{catalog,protocols,anamnesis}` autenticados por chave (hash sha256, header Bearer), servindo só `published`; client admin server-only; `last_used_at`. Módulo de chaves: criar (revela uma vez), rotacionar, revogar, prefixo mascarado. Migration `api_keys.key_prefix`. Validado: 401 sem chave, dados só publicados com chave; produto rascunho corretamente omitido.

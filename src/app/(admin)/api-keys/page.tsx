@@ -1,10 +1,7 @@
-import ModulePlaceholder from "@/components/ModulePlaceholder";
+import { listApiKeys } from "@/lib/api-keys/queries";
+import ApiKeysClient from "./ApiKeysClient";
 
-export default function Page() {
-  return (
-    <ModulePlaceholder
-      title="Chaves de API"
-      description="Geração e gestão das chaves da Storefront API que o front usa para consumir o catálogo publicado."
-    />
-  );
+export default async function ApiKeysPage() {
+  const apiKeys = await listApiKeys();
+  return <ApiKeysClient apiKeys={apiKeys} />;
 }
