@@ -39,6 +39,7 @@ import {
   type Supplier,
 } from "@/lib/protocols/types";
 import { saveProtocol, saveFormula, deleteFormula } from "../actions";
+import { useToast } from "@/components/ToastProvider";
 
 const emptyFormula = {
   name: "",
@@ -52,6 +53,7 @@ const emptyFormula = {
 
 export default function ProtocolDetailClient({ protocol }: { protocol: ProtocolDetail }) {
   const router = useRouter();
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
 
   // Formula dialog
@@ -71,6 +73,7 @@ export default function ProtocolDetailClient({ protocol }: { protocol: ProtocolD
       status: protocol.status === "published" ? "draft" : "published",
     });
     setBusy(false);
+    toast.success(protocol.status === "published" ? "Protocolo despublicado" : "Protocolo publicado");
     router.refresh();
   }
 
@@ -115,6 +118,7 @@ export default function ProtocolDetailClient({ protocol }: { protocol: ProtocolD
     setBusy(false);
     if (!result.ok) { setError(result.error); return; }
     setOpen(false);
+    toast.success(editing ? "Fórmula atualizada" : "Fórmula adicionada");
     router.refresh();
   }
 
@@ -126,6 +130,7 @@ export default function ProtocolDetailClient({ protocol }: { protocol: ProtocolD
     setBusy(false);
     if (!result.ok) { setError(result.error); return; }
     setOpen(false);
+    toast.success("Fórmula excluída");
     router.refresh();
   }
 

@@ -21,6 +21,7 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import { DataTable, type Column } from "@/components/table/DataTable";
 import PublishStatusChip from "@/components/PublishStatusChip";
 import { savePromotion, deletePromotion } from "./actions";
+import { useToast } from "@/components/ToastProvider";
 import {
   formatPromotionValue,
   promotionTypeLabels,
@@ -60,6 +61,7 @@ const emptyForm = { code: "", type: "percent" as PromotionType, value: "", valid
 
 export default function PromotionsClient({ promotions }: { promotions: Promotion[] }) {
   const router = useRouter();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Promotion | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -96,7 +98,7 @@ export default function PromotionsClient({ promotions }: { promotions: Promotion
     });
     setSaving(false);
     if (!result.ok) { setError(result.error); return; }
-    setOpen(false); router.refresh();
+    setOpen(false); toast.success(editing ? "Promoção atualizada" : "Promoção criada"); router.refresh();
   }
 
   async function handleDelete() {
@@ -106,7 +108,7 @@ export default function PromotionsClient({ promotions }: { promotions: Promotion
     const result = await deletePromotion(editing.id);
     setSaving(false);
     if (!result.ok) { setError(result.error); return; }
-    setOpen(false); router.refresh();
+    setOpen(false); toast.success("Promoção excluída"); router.refresh();
   }
 
   return (

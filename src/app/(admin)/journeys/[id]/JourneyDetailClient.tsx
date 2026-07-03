@@ -17,8 +17,6 @@ import DialogActions from "@mui/material/DialogActions";
 import TextField from "@mui/material/TextField";
 import MenuItem from "@mui/material/MenuItem";
 import Alert from "@mui/material/Alert";
-import Switch from "@mui/material/Switch";
-import FormControlLabel from "@mui/material/FormControlLabel";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
@@ -29,6 +27,7 @@ import PublishStatusChip from "@/components/PublishStatusChip";
 import { formatBRL, billingLabels } from "@/lib/catalog/types";
 import type { JourneyDetail, PlanOption } from "@/lib/journeys/types";
 import { saveJourney, attachPlan, detachPlan } from "../actions";
+import { useToast } from "@/components/ToastProvider";
 
 export default function JourneyDetailClient({
   journey,
@@ -38,6 +37,7 @@ export default function JourneyDetailClient({
   planOptions: PlanOption[];
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
 
   // Editar jornada
@@ -64,6 +64,7 @@ export default function JourneyDetailClient({
       status: journey.status === "published" ? "draft" : "published",
     });
     setBusy(false);
+    toast.success(journey.status === "published" ? "Jornada despublicada" : "Jornada publicada");
     router.refresh();
   }
 
@@ -84,6 +85,7 @@ export default function JourneyDetailClient({
     setBusy(false);
     if (!result.ok) { setError(result.error); return; }
     setEditOpen(false);
+    toast.success("Jornada atualizada");
     router.refresh();
   }
 
@@ -94,6 +96,7 @@ export default function JourneyDetailClient({
     setBusy(false);
     setAttachOpen(false);
     setPlanId("");
+    toast.success("Plano vinculado");
     router.refresh();
   }
 
@@ -101,6 +104,7 @@ export default function JourneyDetailClient({
     setBusy(true);
     await detachPlan(journey.id, id);
     setBusy(false);
+    toast.success("Plano desvinculado");
     router.refresh();
   }
 

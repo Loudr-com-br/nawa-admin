@@ -26,6 +26,7 @@ import { DataTable, type Column } from "@/components/table/DataTable";
 import { roleLabels, type AppRole } from "@/lib/supabase/roles";
 import type { InternalUser } from "@/lib/users/queries";
 import { inviteUser, setUserRole, setUserStatus } from "./actions";
+import { useToast } from "@/components/ToastProvider";
 
 const roles: AppRole[] = ["super_admin", "catalog_admin", "doctor", "operator"];
 
@@ -48,6 +49,7 @@ const INTEGRATIONS = [
 
 export default function SettingsClient({ users, currentEmail }: { users: InternalUser[]; currentEmail: string }) {
   const router = useRouter();
+  const toast = useToast();
   const [tab, setTab] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,6 +89,7 @@ export default function SettingsClient({ users, currentEmail }: { users: Interna
     if (!result.ok) { setError(result.error); return; }
     setInviteOpen(false);
     setInviteForm({ email: "", role: "operator" });
+    toast.success("Usuário convidado");
     router.refresh();
   }
 
@@ -113,6 +116,7 @@ export default function SettingsClient({ users, currentEmail }: { users: Interna
     }
     setBusy(false);
     setEditOpen(false);
+    toast.success("Usuário atualizado");
     router.refresh();
   }
 

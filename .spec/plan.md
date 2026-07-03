@@ -38,8 +38,8 @@
 - [x] `DataTable` reutilizável: ordenação por header, paginação (10 padrão + seletor), contagem
 - [x] Indicadores de status discretos (`StatusChip` ponto+rótulo, `Glp1Tag`)
 - [x] Primitivas de detalhe (`SectionCard`, `DefRow`)
-- [ ] Estados vazios / erro / loading padronizados
-- [ ] Toasts e confirmações de ação
+- [~] Estados vazios / erro / loading padronizados — **error boundary** (`(admin)/error.tsx`) com fallback gracioso (sem tela branca; distingue "backend não configurado" de erro genérico com retry); estados vazios via `emptyMessage` nas tabelas. Loading skeleton ainda pendente
+- [x] Toasts e confirmações de ação — `ToastProvider` (`useToast().success/error`) integrado a todos os fluxos CRUD (catálogo, protocolos, jornadas, anamnese, promoções, atributos, assinaturas, api-keys, configuração); confirmação inline de exclusão (dois cliques)
 - [x] Formulário padrão criar/editar (diálogo + Server Action) — 1ª versão em Atributos
 
 ---

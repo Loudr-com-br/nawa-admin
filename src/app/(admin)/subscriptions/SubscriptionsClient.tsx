@@ -19,6 +19,7 @@ import Button from "@mui/material/Button";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import { DataTable, type Column } from "@/components/table/DataTable";
 import SubscriptionStatusChip from "@/components/SubscriptionStatusChip";
+import { useToast } from "@/components/ToastProvider";
 import { formatDate } from "@/lib/orders/format";
 import {
   subStatusConfig,
@@ -41,6 +42,7 @@ export default function SubscriptionsClient({
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<SubscriptionStatus | "all">("all");
+  const toast = useToast();
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [menuSub, setMenuSub] = useState<Subscription | null>(null);
   const [busy, setBusy] = useState(false);
@@ -53,11 +55,13 @@ export default function SubscriptionsClient({
     [subscriptions, status]
   );
 
-  async function apply(fn: () => Promise<unknown>) {
+  async function apply(fn: () => Promise<{ ok: boolean; error?: string }>, successMsg: string) {
     setMenuAnchor(null);
     setBusy(true);
-    await fn();
+    const result = await fn();
     setBusy(false);
+    if (result.ok) toast.success(successMsg);
+    else toast.error(result.error ?? "Não foi possível concluir.");
     router.refresh();
   }
 
@@ -123,10 +127,10 @@ export default function SubscriptionsClient({
 
       <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}>
         {s && s.status === "active" && (
-          <MenuItem disabled={busy} onClick={() => apply(() => setSubscriptionStatus(s.id, "paused"))}>Pausar</MenuItem>
+          <MenuItem disabled={busy} onClick={() => apply(() => setSubscriptionStatus(s.id, "paused"), "Assinatura pausada")}>Pausar</MenuItem>
         )}
         {s && (s.status === "paused" || s.status === "past_due" || s.status === "canceled") && (
-          <MenuItem disabled={busy} onClick={() => apply(() => setSubscriptionStatus(s.id, "active"))}>
+          <MenuItem disabled={busy} onClick={() => apply(() => setSubscriptionStatus(s.id, "active"), s.status === "past_due" ? "Cobrança retentada" : "Assinatura reativada")}>
             {s.status === "past_due" ? "Retentar cobrança" : "Reativar"}
           </MenuItem>
         )}
@@ -134,7 +138,7 @@ export default function SubscriptionsClient({
           <MenuItem disabled={busy} onClick={() => { setPlanId(s.planId); setMenuAnchor(null); setPlanOpen(true); }}>Mudar plano</MenuItem>
         )}
         {s && s.status !== "canceled" && (
-          <MenuItem disabled={busy} sx={{ color: "error.main" }} onClick={() => apply(() => setSubscriptionStatus(s.id, "canceled"))}>Cancelar</MenuItem>
+          <MenuItem disabled={busy} sx={{ color: "error.main" }} onClick={() => apply(() => setSubscriptionStatus(s.id, "canceled"), "Assinatura cancelada")}>Cancelar</MenuItem>
         )}
       </Menu>
 
@@ -147,7 +151,7 @@ export default function SubscriptionsClient({
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setPlanOpen(false)} color="inherit" disabled={busy}>Cancelar</Button>
-          <Button variant="contained" disabled={busy || !planId || !s} onClick={() => { const sub = s; setPlanOpen(false); if (sub) apply(() => changeSubscriptionPlan(sub.id, planId)); }}>Salvar</Button>
+          <Button variant="contained" disabled={busy || !planId || !s} onClick={() => { const sub = s; setPlanOpen(false); if (sub) apply(() => changeSubscriptionPlan(sub.id, planId), "Plano alterado"); }}>Salvar</Button>
         </DialogActions>
       </Dialog>
     </Box>

@@ -37,6 +37,7 @@ import {
   saveProduct,
   deleteProduct,
 } from "./actions";
+import { useToast } from "@/components/ToastProvider";
 
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));
@@ -76,6 +77,7 @@ export default function CatalogClient({
   refOptions: RefOption[];
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [tab, setTab] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -138,7 +140,7 @@ export default function CatalogClient({
     });
     setSaving(false);
     if (!result.ok) { setError(result.error); return; }
-    setPlanOpen(false); router.refresh();
+    setPlanOpen(false); toast.success(editingPlan ? "Plano atualizado" : "Plano criado"); router.refresh();
   }
 
   async function handleDeletePlan() {
@@ -148,7 +150,7 @@ export default function CatalogClient({
     const result = await deletePlan(editingPlan.id);
     setSaving(false);
     if (!result.ok) { setError(result.error); return; }
-    setPlanOpen(false); router.refresh();
+    setPlanOpen(false); toast.success("Plano excluído"); router.refresh();
   }
 
   async function handleSaveProduct() {
@@ -166,7 +168,7 @@ export default function CatalogClient({
     });
     setSaving(false);
     if (!result.ok) { setError(result.error); return; }
-    setProdOpen(false); router.refresh();
+    setProdOpen(false); toast.success(editingProduct ? "Produto atualizado" : "Produto criado"); router.refresh();
   }
 
   async function handleDeleteProduct() {
@@ -176,7 +178,7 @@ export default function CatalogClient({
     const result = await deleteProduct(editingProduct.id);
     setSaving(false);
     if (!result.ok) { setError(result.error); return; }
-    setProdOpen(false); router.refresh();
+    setProdOpen(false); toast.success("Produto excluído"); router.refresh();
   }
 
   return (

@@ -35,6 +35,7 @@ import {
   type QuestionType,
 } from "@/lib/anamnesis/types";
 import { saveForm, saveQuestion, deleteQuestion, reorderQuestions } from "../actions";
+import { useToast } from "@/components/ToastProvider";
 
 const emptyQuestion = {
   label: "",
@@ -48,6 +49,7 @@ const emptyQuestion = {
 
 export default function AnamnesisBuilderClient({ form }: { form: AnamnesisFormDetail }) {
   const router = useRouter();
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [questions, setQuestions] = useState<Question[]>(form.questions);
 
@@ -69,6 +71,7 @@ export default function AnamnesisBuilderClient({ form }: { form: AnamnesisFormDe
       status: form.status === "published" ? "draft" : "published",
     });
     setBusy(false);
+    toast.success(form.status === "published" ? "Formulário despublicado" : "Formulário publicado");
     router.refresh();
   }
 
@@ -114,6 +117,7 @@ export default function AnamnesisBuilderClient({ form }: { form: AnamnesisFormDe
     setBusy(false);
     if (!result.ok) { setError(result.error); return; }
     setOpen(false);
+    toast.success(editing ? "Pergunta atualizada" : "Pergunta adicionada");
     router.refresh();
   }
 
@@ -125,6 +129,7 @@ export default function AnamnesisBuilderClient({ form }: { form: AnamnesisFormDe
     setBusy(false);
     if (!result.ok) { setError(result.error); return; }
     setOpen(false);
+    toast.success("Pergunta excluída");
     router.refresh();
   }
 

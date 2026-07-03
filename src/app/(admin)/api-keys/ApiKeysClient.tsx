@@ -21,6 +21,7 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import { DataTable, type Column } from "@/components/table/DataTable";
 import { createKey, revokeKey, rotateKey } from "./actions";
+import { useToast } from "@/components/ToastProvider";
 import type { ApiKey } from "@/lib/api-keys/queries";
 
 function formatDateTime(iso: string | null) {
@@ -46,6 +47,7 @@ const ENDPOINTS = [
 
 export default function ApiKeysClient({ apiKeys }: { apiKeys: ApiKey[] }) {
   const router = useRouter();
+  const toast = useToast();
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +82,7 @@ export default function ApiKeysClient({ apiKeys }: { apiKeys: ApiKey[] }) {
     setCreateOpen(false);
     setName("");
     if (result.raw) setRevealKey(result.raw);
+    toast.success("Chave criada");
     router.refresh();
   }
 
@@ -90,7 +93,8 @@ export default function ApiKeysClient({ apiKeys }: { apiKeys: ApiKey[] }) {
     setBusy(true);
     const result = await rotateKey(target.id);
     setBusy(false);
-    if (result.ok && result.raw) setRevealKey(result.raw);
+    if (result.ok) { if (result.raw) setRevealKey(result.raw); toast.success("Chave rotacionada"); }
+    else toast.error(result.error);
     router.refresh();
   }
 
@@ -99,8 +103,10 @@ export default function ApiKeysClient({ apiKeys }: { apiKeys: ApiKey[] }) {
     const target = menuKey;
     setMenuAnchor(null);
     setBusy(true);
-    await revokeKey(target.id);
+    const result = await revokeKey(target.id);
     setBusy(false);
+    if (result.ok) toast.success("Chave revogada");
+    else toast.error(result.error);
     router.refresh();
   }
 

@@ -22,6 +22,7 @@ import {
   updateAttribute,
   deleteAttribute,
 } from "./actions";
+import { useToast } from "@/components/ToastProvider";
 import {
   attributeTypes,
   scopeLabels,
@@ -98,6 +99,7 @@ const emptyForm = { scope: "catalog" as AttributeScope, label: "", key: "", type
 
 export default function AttributesClient({ attributes }: { attributes: Attribute[] }) {
   const router = useRouter();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Attribute | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -137,6 +139,7 @@ export default function AttributesClient({ attributes }: { attributes: Attribute
       return;
     }
     setOpen(false);
+    toast.success(editing ? "Atributo atualizado" : "Atributo criado");
     router.refresh();
   }
 
@@ -154,6 +157,7 @@ export default function AttributesClient({ attributes }: { attributes: Attribute
       return;
     }
     setOpen(false);
+    toast.success("Atributo excluído");
     router.refresh();
   }
 
