@@ -33,10 +33,13 @@ O **publish model** foi desenhado para isto: o dado servido é sempre
   cache autenticado (cai na função e recebe 401).
 - `last_used_at` deixou de gravar por request (throttle de 5 min) — elimina a
   escrita-por-leitura que não escalava.
+- **Purge-on-publish**: cada resposta leva `Netlify-Cache-Tag` (`storefront-catalog`
+  / `-protocols` / `-anamnesis`); as ações de publicação no backoffice chamam
+  `purgeCache({ tags })` (via `@netlify/functions`) e invalidam o cache na hora.
+  Best-effort (fora do runtime Netlify é no-op). O TTL de 60s continua como
+  fallback. Ver `src/lib/storefront/purge.ts`.
 
 **Roadmap:**
-- **Purge/revalidate no publish**: ao publicar algo no backoffice, invalidar a
-  chave de cache correspondente (propagação rápida sem esperar o TTL).
 - **Cache no front também**: o front (Next SSR) deve cachear o catálogo,
   reduzindo ainda mais o fan-out.
 - **Cache KV do catálogo publicado** (ex: edge KV) se a taxa de publish crescer.

@@ -143,8 +143,9 @@ Vary: Authorization, x-api-key
 - O CDN serve do cache por **60s** e serve "stale" por até **5min** enquanto
   revalida em background. A maioria dos acessos nem toca o banco.
 - Cache é **por chave** (`Vary`).
-- **Propagação de publish**: uma mudança publicada aparece em até ~1 min (TTL).
-  No roadmap há purge/revalidate no publish para propagação imediata.
+- **Propagação de publish é imediata**: ao publicar no backoffice, o cache da
+  tag correspondente (`storefront-catalog` / `-protocols` / `-anamnesis`) é
+  purgado na hora. O TTL de 60s é só fallback.
 - Recomendação: **o front também deve cachear** o catálogo (revalidação por
   tempo/tag), reduzindo o fan-out.
 

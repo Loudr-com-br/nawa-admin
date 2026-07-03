@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { purgeCatalog } from "@/lib/storefront/purge";
 import type { ContentStatus, ProductRefType } from "@/lib/catalog/types";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -40,6 +41,7 @@ export async function savePlan(id: string | null, input: PlanInput): Promise<Act
     : await supabase.from("plans").insert(row);
   if (error) return { ok: false, error: friendlyError(error.message) };
   revalidatePath("/catalog");
+  await purgeCatalog();
   return { ok: true };
 }
 
@@ -48,6 +50,7 @@ export async function deletePlan(id: string): Promise<ActionResult> {
   const { error } = await supabase.from("plans").delete().eq("id", id);
   if (error) return { ok: false, error: friendlyError(error.message) };
   revalidatePath("/catalog");
+  await purgeCatalog();
   return { ok: true };
 }
 
@@ -76,6 +79,7 @@ export async function saveProduct(id: string | null, input: ProductInput): Promi
     : await supabase.from("commercial_products").insert(row);
   if (error) return { ok: false, error: friendlyError(error.message) };
   revalidatePath("/catalog");
+  await purgeCatalog();
   return { ok: true };
 }
 
@@ -84,6 +88,7 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
   const { error } = await supabase.from("commercial_products").delete().eq("id", id);
   if (error) return { ok: false, error: friendlyError(error.message) };
   revalidatePath("/catalog");
+  await purgeCatalog();
   return { ok: true };
 }
 
@@ -93,6 +98,7 @@ export async function setPlanStatus(id: string, status: ContentStatus): Promise<
   const { error } = await supabase.from("plans").update({ status }).eq("id", id);
   if (error) return { ok: false, error: friendlyError(error.message) };
   revalidatePath("/catalog");
+  await purgeCatalog();
   return { ok: true };
 }
 
@@ -101,5 +107,6 @@ export async function setProductStatus(id: string, status: ContentStatus): Promi
   const { error } = await supabase.from("commercial_products").update({ status }).eq("id", id);
   if (error) return { ok: false, error: friendlyError(error.message) };
   revalidatePath("/catalog");
+  await purgeCatalog();
   return { ok: true };
 }

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { purgeAnamnesis } from "@/lib/storefront/purge";
 import type { Json } from "@/lib/supabase/database.types";
 import type { ContentStatus } from "@/lib/catalog/types";
 import type { Conditional, QuestionType } from "@/lib/anamnesis/types";
@@ -29,12 +30,14 @@ export async function saveForm(id: string | null, input: FormInput): Promise<Act
     const { error } = await supabase.from("anamnesis_forms").update(row).eq("id", id);
     if (error) return { ok: false, error: friendlyError(error.message) };
     revalidatePath("/anamnesis");
+  await purgeAnamnesis();
     revalidatePath(`/anamnesis/${id}`);
     return { ok: true, id };
   }
   const { data, error } = await supabase.from("anamnesis_forms").insert(row).select("id").single();
   if (error) return { ok: false, error: friendlyError(error.message) };
   revalidatePath("/anamnesis");
+  await purgeAnamnesis();
   return { ok: true, id: data.id };
 }
 
@@ -43,6 +46,7 @@ export async function deleteForm(id: string): Promise<ActionResult> {
   const { error } = await supabase.from("anamnesis_forms").delete().eq("id", id);
   if (error) return { ok: false, error: friendlyError(error.message) };
   revalidatePath("/anamnesis");
+  await purgeAnamnesis();
   return { ok: true };
 }
 
@@ -75,6 +79,7 @@ export async function saveQuestion(id: string | null, input: QuestionInput): Pro
     : await supabase.from("anamnesis_questions").insert(row);
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/anamnesis/${input.formId}`);
+  await purgeAnamnesis();
   return { ok: true };
 }
 
@@ -83,6 +88,7 @@ export async function deleteQuestion(id: string, formId: string): Promise<Action
   const { error } = await supabase.from("anamnesis_questions").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/anamnesis/${formId}`);
+  await purgeAnamnesis();
   return { ok: true };
 }
 
@@ -94,5 +100,6 @@ export async function reorderQuestions(formId: string, orderedIds: string[]): Pr
     if (error) return { ok: false, error: error.message };
   }
   revalidatePath(`/anamnesis/${formId}`);
+  await purgeAnamnesis();
   return { ok: true };
 }

@@ -17,12 +17,14 @@ import { NextResponse } from "next/server";
  * Quando algo é publicado no backoffice, o ideal é purgar/revalidar essa chave
  * de cache (roadmap em `.spec/escalabilidade.md`).
  */
-export function storefrontJson(data: unknown) {
+export function storefrontJson(data: unknown, cacheTag: string) {
   const cache = "public, max-age=0, s-maxage=60, stale-while-revalidate=300";
   return NextResponse.json(data, {
     headers: {
       "Cache-Control": cache,
       "Netlify-CDN-Cache-Control": cache,
+      // Tag para purge seletivo no publish (ver lib/storefront/purge.ts).
+      "Netlify-Cache-Tag": cacheTag,
       Vary: "Authorization, x-api-key",
     },
   });

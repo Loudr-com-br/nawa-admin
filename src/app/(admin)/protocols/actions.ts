@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { purgeProtocols } from "@/lib/storefront/purge";
 import type { ContentStatus } from "@/lib/catalog/types";
 import type { PharmaceuticalForm, Supplier } from "@/lib/protocols/types";
 
@@ -39,12 +40,14 @@ export async function saveProtocol(
     const { error } = await supabase.from("protocols").update(row).eq("id", id);
     if (error) return { ok: false, error: friendlyError(error.message) };
     revalidatePath("/protocols");
+  await purgeProtocols();
     revalidatePath(`/protocols/${id}`);
     return { ok: true, id };
   }
   const { data, error } = await supabase.from("protocols").insert(row).select("id").single();
   if (error) return { ok: false, error: friendlyError(error.message) };
   revalidatePath("/protocols");
+  await purgeProtocols();
   return { ok: true, id: data.id };
 }
 
@@ -53,6 +56,7 @@ export async function deleteProtocol(id: string): Promise<ActionResult> {
   const { error } = await supabase.from("protocols").delete().eq("id", id);
   if (error) return { ok: false, error: friendlyError(error.message) };
   revalidatePath("/protocols");
+  await purgeProtocols();
   return { ok: true };
 }
 
@@ -88,6 +92,7 @@ export async function saveFormula(
     : await supabase.from("formulas").insert(row);
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/protocols/${input.protocolId}`);
+  await purgeProtocols();
   return { ok: true };
 }
 
@@ -96,5 +101,6 @@ export async function deleteFormula(id: string, protocolId: string): Promise<Act
   const { error } = await supabase.from("formulas").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/protocols/${protocolId}`);
+  await purgeProtocols();
   return { ok: true };
 }

@@ -134,7 +134,7 @@ export default function ApiKeysClient({ apiKeys }: { apiKeys: ApiKey[] }) {
             Autenticação: header <code>Authorization: Bearer &lt;chave&gt;</code>. Só registros publicados são servidos.
           </Typography>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
-            Respostas são cacheadas na borda (~1 min): mudanças publicadas propagam ao front em até 1 minuto.
+            Respostas cacheadas na borda; ao publicar, o cache é invalidado na hora (propagação imediata ao front).
           </Typography>
         </CardContent>
       </Card>

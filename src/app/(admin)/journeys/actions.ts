@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { purgeCatalog } from "@/lib/storefront/purge";
 import type { Json } from "@/lib/supabase/database.types";
 import type { ContentStatus } from "@/lib/catalog/types";
 import type { JourneyContent } from "@/lib/journeys/types";
@@ -34,12 +35,14 @@ export async function saveJourney(id: string | null, input: JourneyInput): Promi
     const { error } = await supabase.from("journeys").update(row).eq("id", id);
     if (error) return { ok: false, error: friendlyError(error.message) };
     revalidatePath("/journeys");
+    await purgeCatalog();
     revalidatePath(`/journeys/${id}`);
     return { ok: true, id };
   }
   const { data, error } = await supabase.from("journeys").insert(row).select("id").single();
   if (error) return { ok: false, error: friendlyError(error.message) };
   revalidatePath("/journeys");
+    await purgeCatalog();
   return { ok: true, id: data.id };
 }
 
@@ -48,6 +51,7 @@ export async function deleteJourney(id: string): Promise<ActionResult> {
   const { error } = await supabase.from("journeys").delete().eq("id", id);
   if (error) return { ok: false, error: friendlyError(error.message) };
   revalidatePath("/journeys");
+    await purgeCatalog();
   return { ok: true };
 }
 
@@ -57,6 +61,7 @@ export async function attachPlan(journeyId: string, planId: string): Promise<Act
   const { error } = await supabase.from("plans").update({ journey_id: journeyId }).eq("id", planId);
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/journeys/${journeyId}`);
+  await purgeCatalog();
   return { ok: true };
 }
 
@@ -66,5 +71,6 @@ export async function detachPlan(journeyId: string, planId: string): Promise<Act
   const { error } = await supabase.from("plans").update({ journey_id: null }).eq("id", planId);
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/journeys/${journeyId}`);
+  await purgeCatalog();
   return { ok: true };
 }
