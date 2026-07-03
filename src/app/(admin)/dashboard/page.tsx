@@ -49,7 +49,7 @@ export default async function DashboardPage() {
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}><MetricCard icon={PeopleAltRoundedIcon} value={String(m.patientCount)} label="Pacientes" hint="cadastrados" /></Grid>
       </Grid>
 
-      <Grid container spacing={2.5} sx={{ mt: 0 }}>
+      <Grid container spacing={2.5} sx={{ mt: 2.5 }}>
         {/* Pedidos recentes */}
         <Grid size={{ xs: 12, lg: 8 }}>
           <Card>
