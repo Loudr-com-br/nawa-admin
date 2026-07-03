@@ -118,7 +118,7 @@ export default function ProtocolsClient({ protocols }: { protocols: Protocol[] }
           <Stack spacing={2.5} sx={{ mt: 0.5 }}>
             <TextField label="Nome" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Reset Metabólico Avançado" autoFocus />
             <TextField label="Slug" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="reset-avancado" helperText="Identificador único." />
-            <TextField label="Descrição clínica" value={form.clinicalDescription} onChange={(e) => setForm({ ...form, clinicalDescription: e.target.value })} multiline minRows={2} />
+            <TextField label="Descrição clínica" value={form.clinicalDescription} onChange={(e) => setForm({ ...form, clinicalDescription: e.target.value })} multiline rows={3} />
             <TextField label="Ref. Botane (external_ref)" value={form.externalRef} onChange={(e) => setForm({ ...form, externalRef: e.target.value })} placeholder="BOT-P-002" helperText="Vínculo com o registro de origem na Botane." />
             <FormControlLabel control={<Switch checked={form.published} onChange={(e) => setForm({ ...form, published: e.target.checked })} />}
               label={<Typography variant="body2">Publicado <Typography component="span" variant="caption" color="text.secondary">(visível ao front)</Typography></Typography>} />

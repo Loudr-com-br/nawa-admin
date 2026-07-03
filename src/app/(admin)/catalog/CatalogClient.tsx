@@ -247,7 +247,7 @@ export default function CatalogClient({
               </TextField>
             </Stack>
             <TextField label="Inclusões" value={planForm.inclusions} onChange={(e) => setPlanForm({ ...planForm, inclusions: e.target.value })}
-              multiline minRows={2} placeholder={"Acompanhamento médico\nGLP-1 incluso"} helperText="Uma inclusão por linha." />
+              multiline rows={3} placeholder={"Acompanhamento médico\nGLP-1 incluso"} helperText="Uma inclusão por linha." />
             <FormControlLabel control={<Switch checked={planForm.published} onChange={(e) => setPlanForm({ ...planForm, published: e.target.checked })} />}
               label={<Typography variant="body2">Publicado <Typography component="span" variant="caption" color="text.secondary">(visível ao front)</Typography></Typography>} />
             {error && <Alert severity="error">{error}</Alert>}

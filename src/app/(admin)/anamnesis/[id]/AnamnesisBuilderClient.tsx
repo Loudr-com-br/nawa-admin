@@ -225,7 +225,7 @@ export default function AnamnesisBuilderClient({ form }: { form: AnamnesisFormDe
               <TextField label="Peso de risco" type="number" value={q.riskWeight} onChange={(e) => setQ({ ...q, riskWeight: e.target.value })} sx={{ width: 160 }} />
             </Stack>
             {typesWithOptions.includes(q.type) && (
-              <TextField label="Opções" value={q.options} onChange={(e) => setQ({ ...q, options: e.target.value })} multiline minRows={2} placeholder={"Sedentário\nLeve\nModerado\nIntenso"} helperText="Uma opção por linha." />
+              <TextField label="Opções" value={q.options} onChange={(e) => setQ({ ...q, options: e.target.value })} multiline rows={3} placeholder={"Sedentário\nLeve\nModerado\nIntenso"} helperText="Uma opção por linha." />
             )}
             <FormControlLabel control={<Switch checked={q.required} onChange={(e) => setQ({ ...q, required: e.target.checked })} />} label={<Typography variant="body2">Obrigatória</Typography>} />
 

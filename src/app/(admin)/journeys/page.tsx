@@ -1,10 +1,7 @@
-import ModulePlaceholder from "@/components/ModulePlaceholder";
+import { listJourneys } from "@/lib/journeys/queries";
+import JourneysClient from "./JourneysClient";
 
-export default function Page() {
-  return (
-    <ModulePlaceholder
-      title="Jornadas"
-      description="Gestão da jornada Metabolic Reset e estrutura para jornadas futuras. Define planos e conteúdo associado."
-    />
-  );
+export default async function JourneysPage() {
+  const journeys = await listJourneys();
+  return <JourneysClient journeys={journeys} />;
 }

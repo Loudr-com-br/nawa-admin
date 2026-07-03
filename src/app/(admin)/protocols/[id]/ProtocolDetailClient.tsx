@@ -241,7 +241,7 @@ export default function ProtocolDetailClient({ protocol }: { protocol: ProtocolD
               <MenuItem value="partner">{supplierLabels.partner}</MenuItem>
             </TextField>
             <TextField label="Ref. externa" value={form.externalRef} onChange={(e) => setForm({ ...form, externalRef: e.target.value })} placeholder="BOT-F-020" helperText="Vínculo com a origem (Botane/parceiro)." />
-            <TextField label="Elegibilidade" value={form.eligibilityNotes} onChange={(e) => setForm({ ...form, eligibilityNotes: e.target.value })} multiline minRows={2} placeholder="Critérios por perfil da anamnese" />
+            <TextField label="Elegibilidade" value={form.eligibilityNotes} onChange={(e) => setForm({ ...form, eligibilityNotes: e.target.value })} multiline rows={3} placeholder="Critérios por perfil da anamnese" />
             <FormControlLabel
               control={<Switch checked={form.isGlp1} onChange={(e) => setForm({ ...form, isGlp1: e.target.checked })} />}
               label={<Typography variant="body2">GLP-1 <Typography component="span" variant="caption" color="text.secondary">(ponte clínica/comercial)</Typography></Typography>}

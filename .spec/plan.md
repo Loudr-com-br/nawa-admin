@@ -3,7 +3,7 @@
 > Documento vivo. Atualizar conforme avançamos.
 > Ordem de construção baseada na seção 11 do [`spec.md`](spec.md).
 >
-> **Última atualização:** 2026-07-03 (Anamnese: form builder completo)
+> **Última atualização:** 2026-07-03 (Jornadas com planos e conteúdo)
 
 ## Legenda
 
@@ -76,8 +76,8 @@ Módulo mais estratégico.
 - [ ] Contrato de leitura para o front renderizar (via Storefront API)
 
 ### 6. Jornadas (`/journeys`) — §5.8
-- [ ] Metabolic Reset: amarração de planos e conteúdo
-- [ ] Estrutura preparada para jornadas futuras
+- [x] Lista + detalhe: amarração de planos (vincular/desvincular) e conteúdo (tagline/descrição/destaques)
+- [x] Publish model; estrutura pronta para jornadas futuras
 
 ### 7. Storefront API + chaves (`/api-keys`) — §5.12 / §9.2
 - [ ] Contrato de leitura (só `status = published`)
@@ -137,4 +137,5 @@ Módulo mais estratégico.
 - **2026-07-02** — Marco commitado e enviado à branch `dev`. `node_modules` destrackado; `.gitignore` reforçado (env, xlsx/pdf, supabase temp). Repo remoto mudou p/ `Loudr-com-br/nawa-front`.
 - **2026-07-03** — **Catálogo** (`/catalog`): abas Planos/Produtos, CRUD via Server Actions e **publish model** (rascunho/publicado) com `PublishStatusChip`. Migration `commercial_products.ref_id` anulável (add-ons). Validado criando add-on em rascunho. Commitado na `dev`.
 - **2026-07-03** — **Protocolos** (`/protocols`): lista + detalhe (`/protocols/[id]`) com CRUD de fórmulas, formas farmacêuticas, fornecedor, elegibilidade e **ponte GLP-1** (magistral Botane / original parceiro). Publish toggle no cabeçalho. Validado adicionando fórmula ao vivo. Commitado na `dev`.
-- **2026-07-03** — **Anamnese** (`/anamnesis`): form builder completo — lista + `/anamnesis/[id]` com CRUD de perguntas (tipos, opções, obrigatoriedade, reordenação), lógica condicional e score de risco. Migration `anamnesis_questions` (options/required). Seed de formulário com 10 perguntas (`npm run seed:anamnesis`).
+- **2026-07-03** — **Anamnese** (`/anamnesis`): form builder completo — lista + `/anamnesis/[id]` com CRUD de perguntas (tipos, opções, obrigatoriedade, reordenação), lógica condicional e score de risco. Migration `anamnesis_questions` (options/required). Seed de formulário com 10 perguntas (`npm run seed:anamnesis`). Commitado na `dev`.
+- **2026-07-03** — **Jornadas** (`/journeys`): lista + detalhe com vínculo/desvínculo de planos e edição de conteúdo (tagline/descrição/destaques em jsonb), publish toggle. Fix: campos multiline com `rows` fixo (evita loop do TextareaAutosize do MUI + React 19).
