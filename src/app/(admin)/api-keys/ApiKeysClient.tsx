@@ -133,6 +133,9 @@ export default function ApiKeysClient({ apiKeys }: { apiKeys: ApiKey[] }) {
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.5 }}>
             Autenticação: header <code>Authorization: Bearer &lt;chave&gt;</code>. Só registros publicados são servidos.
           </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+            Respostas são cacheadas na borda (~1 min): mudanças publicadas propagam ao front em até 1 minuto.
+          </Typography>
         </CardContent>
       </Card>
 

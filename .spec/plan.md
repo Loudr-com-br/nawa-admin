@@ -2,6 +2,7 @@
 
 > Documento vivo. Atualizar conforme avançamos.
 > Ordem de construção baseada na seção 11 do [`spec.md`](spec.md).
+> Complementos: [`escalabilidade.md`](escalabilidade.md) · [`storefront-api.md`](storefront-api.md)
 >
 > **Última atualização:** 2026-07-03 (Dashboard analítico — visão geral)
 
@@ -83,6 +84,9 @@ Módulo mais estratégico.
 - [x] Contrato de leitura (`/api/storefront/{catalog,protocols,anamnesis}`) — só `status = published`
 - [x] Geração/revogação/rotação de chaves (guardadas como hash, escopo leitura, `last_used_at`)
 - [x] Endpoints (Route Handlers) validando a chave via header Bearer; middleware libera a rota
+- [x] Escala (quick wins): cache de borda (`s-maxage`+`stale-while-revalidate`+`Vary`), `last_used_at` com throttle (não grava por request) — ver [`escalabilidade.md`](escalabilidade.md)
+- [x] Guia da API para o front: [`storefront-api.md`](storefront-api.md)
+- [ ] Purge/revalidate no publish; rate limiting; versionamento `v1`
 - [ ] Mover para Netlify Functions no deploy (hoje Route Handlers do Next servem o mesmo contrato)
 
 ### 8. Promoções (`/promotions`) — §5.10
