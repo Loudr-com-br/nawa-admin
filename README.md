@@ -1,70 +1,60 @@
-# NAWA Design System
+# NAWA Backoffice
 
-Sistema de design oficial da **NAWA Health** — plataforma personalizada de saúde contínua que conecta pessoas a protocolos de saúde e médicos reais.
+Painel administrativo da **NAWA Health** — plataforma premium de saúde metabólica contínua.
 
-## Sobre a NAWA
+O backoffice é a **fonte da verdade** da plataforma: é onde a operação configura catálogo,
+protocolos, anamnese, jornadas, promoções, papéis de acesso e integrações. O front (paciente
+e área médica) é headless e consome o que o backoffice publica via Storefront API.
 
-NAWA é uma plataforma digital de saúde que oferece protocolos personalizados contínuos, acompanhamento médico e gestão de bem-estar. A marca é construída sobre cinco pilares:
-
-| Pilar | Símbolo |
-|---|---|
-| Recuperação | + estilizado |
-| Força | duplo chevron |
-| Energia | seta circular |
-| Foco | quadrado com detalhe |
-| Longevidade | infinito |
-
-A identidade visual é centrada no espaço entre as letras **NA** e **WA** — chamado de *portal* — que pode receber cor sólida, tagline, imagem ou vazio expandido.
-
-> *"A barra entre NA e WA é o portal — o espaço onde a marca coloca o mundo."*
-
-## Sobre o projeto
-
-Este repositório é o **Design System** da NAWA, documentando todos os tokens, componentes e diretrizes visuais do produto digital.
-
-### O que está documentado
-
-| # | Seção | Conteúdo |
-|---|---|---|
-| 01 | Cores | Paleta de marca, escala de azul, neutros e cores semânticas |
-| 02 | Tipografia | Escala completa com AT Aero (fallback: Poppins) |
-| 03 | Espaçamento | Grid baseado em múltiplos de 4pt |
-| 04 | Raio de borda | 6 níveis de arredondamento |
-| 05 | Elevação & Sombra | 4 níveis de sombra + Liquid Glass |
-| 06 | Motion | Durações e curvas de easing |
-| 07 | Botões | Variantes, tamanhos, estados e ícones |
-| 08 | Inputs | Campos, select, textarea e floating label |
-| 09 | Progress & Steps | Barras de progresso, step indicator, radio e checkbox |
-| 10 | Cards | Variantes de card e seleção de plano |
-| 11 | Navegação | Top nav (solid e brand) e bottom navigation mobile |
-| 12 | Toasts | Notificações de sucesso, erro, alerta e informação |
-| 13 | Brand Assets | Assinaturas validadas, ícones de pilar e asset diagonal |
-| 14 | Acessibilidade | Contraste WCAG AA, focus visible e touch targets |
-
-## Identidade visual
-
-- **Cor primária:** Azul NAWA `#204FF1`
-- **Cor escura:** Azul Escuro `#0619AD`
-- **Tipografia:** AT Aero (Arilla Type Studio) — Black 900 para display
-- **Princípio estético:** sólidos, sem gradientes, espaço como elemento de design
+> Especificação completa do produto em [`.spec/spec.md`](.spec/spec.md).
 
 ## Stack
 
+- [Next.js 15](https://nextjs.org/) — App Router
 - [React 19](https://react.dev/)
-- [TypeScript 6](https://www.typescriptlang.org/)
-- [Vite 8](https://vite.dev/)
-- [React Router 7](https://reactrouter.com/)
+- [TypeScript 5](https://www.typescriptlang.org/)
+- [MUI v6](https://mui.com/) — temado pelo Design System da NAWA
+- [Supabase](https://supabase.com/) — Postgres + Auth _(a integrar)_
+- [Netlify Functions](https://docs.netlify.com/functions/overview/) — lógica server-side _(a integrar)_
+
+## Design System
+
+Os tokens do DS vivem em [`src/theme/tokens.ts`](src/theme/tokens.ts) e como CSS variables em
+[`src/app/globals.css`](src/app/globals.css); o tema MUI é derivado deles em
+[`src/theme/theme.ts`](src/theme/theme.ts). A referência visual completa (cores, tipografia,
+componentes) fica na rota **`/ds`**. A identidade da marca está documentada em
+[`ds/design.md`](ds/design.md).
+
+- **Cor primária:** Azul NAWA `#204FF1`
+- **Cor escura:** Azul Escuro `#0619AD`
+- **Tipografia:** AT Aero (fallback: Poppins) — Black 900 para display
+- **Princípio:** light-first, sólidos, sem gradientes
+
+## Estrutura
+
+```
+src/
+  app/
+    (admin)/          # grupo com o shell do backoffice (sidebar + topbar)
+      dashboard/      # e os 14 módulos da seção 5 do spec
+      ...
+    ds/               # showcase do Design System
+    layout.tsx        # root: fontes, MUI cache provider, tema
+  components/
+    shell/            # AdminShell, Sidebar, Topbar, config de navegação
+  ds/                 # componentes do showcase do DS
+  theme/              # tokens, tema MUI e ThemeRegistry
+```
 
 ## Como rodar
 
 ```bash
 npm install
-npm run dev
+npm run dev     # http://localhost:3000  (redireciona para /dashboard)
 ```
-
-Acesse `http://localhost:5173` para ver o Design System.
 
 ```bash
 npm run build   # build de produção
-npm run preview # preview do build
+npm run start   # servir o build
+npm run lint    # eslint (next lint)
 ```

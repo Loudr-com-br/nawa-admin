@@ -4,8 +4,24 @@
 # Dependencies
 node_modules
 
-# Build
-dist
+# Next.js
+.next
+out
+next-env.d.ts
 
-# Vite cache
-.vite
+# Supabase — cache local do CLI
+supabase/.temp
+supabase/.branches
+
+# Env — ignora todos os .env exceto o template
+.env
+.env.*
+!.env.local.example
+
+# Documentos de negócio (não versionar — dado sensível)
+/*.xlsx
+/*.pdf
+
+# Misc
+.DS_Store
+*.pem

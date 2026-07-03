@@ -1,0 +1,10 @@
+# Deploy do NAWA Backoffice no Netlify.
+# O runtime do Next.js é fornecido pelo @netlify/plugin-nextjs, que cuida
+# do roteamento do App Router, SSR e funções. Não usar _redirects de SPA.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
