@@ -1,10 +1,7 @@
-import ModulePlaceholder from "@/components/ModulePlaceholder";
+import { listPromotions } from "@/lib/promotions/queries";
+import PromotionsClient from "./PromotionsClient";
 
-export default function Page() {
-  return (
-    <ModulePlaceholder
-      title="Promoções"
-      description="Regras de preço, cupons e descontos por período. Aplicadas no checkout do front."
-    />
-  );
+export default async function PromotionsPage() {
+  const promotions = await listPromotions();
+  return <PromotionsClient promotions={promotions} />;
 }

@@ -3,7 +3,7 @@
 > Documento vivo. Atualizar conforme avançamos.
 > Ordem de construção baseada na seção 11 do [`spec.md`](spec.md).
 >
-> **Última atualização:** 2026-07-03 (Storefront API + chaves)
+> **Última atualização:** 2026-07-03 (Promoções)
 
 ## Legenda
 
@@ -86,7 +86,8 @@ Módulo mais estratégico.
 - [ ] Mover para Netlify Functions no deploy (hoje Route Handlers do Next servem o mesmo contrato)
 
 ### 8. Promoções (`/promotions`) — §5.10
-- [ ] Cupons, descontos por período, regras de preço
+- [x] CRUD de cupons: código, tipo (percentual/valor fixo), valor, período de vigência, publish
+- [ ] Aplicação/validação no checkout (endpoint server-side dedicado — evitar listar códigos)
 
 ### 9. Botane — saída + Configuração de sistema — §5.13 / §9.1
 - [ ] Envio do pedido para produção (direção `order`)
@@ -140,4 +141,5 @@ Módulo mais estratégico.
 - **2026-07-03** — **Protocolos** (`/protocols`): lista + detalhe (`/protocols/[id]`) com CRUD de fórmulas, formas farmacêuticas, fornecedor, elegibilidade e **ponte GLP-1** (magistral Botane / original parceiro). Publish toggle no cabeçalho. Validado adicionando fórmula ao vivo. Commitado na `dev`.
 - **2026-07-03** — **Anamnese** (`/anamnesis`): form builder completo — lista + `/anamnesis/[id]` com CRUD de perguntas (tipos, opções, obrigatoriedade, reordenação), lógica condicional e score de risco. Migration `anamnesis_questions` (options/required). Seed de formulário com 10 perguntas (`npm run seed:anamnesis`). Commitado na `dev`.
 - **2026-07-03** — **Jornadas** (`/journeys`): lista + detalhe com vínculo/desvínculo de planos e edição de conteúdo (tagline/descrição/destaques em jsonb), publish toggle. Fix: campos multiline com `rows` fixo (evita loop do TextareaAutosize do MUI + React 19). Commitado na `dev`.
-- **2026-07-03** — **Storefront API + Chaves** (`/api-keys`): endpoints `/api/storefront/{catalog,protocols,anamnesis}` autenticados por chave (hash sha256, header Bearer), servindo só `published`; client admin server-only; `last_used_at`. Módulo de chaves: criar (revela uma vez), rotacionar, revogar, prefixo mascarado. Migration `api_keys.key_prefix`. Validado: 401 sem chave, dados só publicados com chave; produto rascunho corretamente omitido.
+- **2026-07-03** — **Storefront API + Chaves** (`/api-keys`): endpoints `/api/storefront/{catalog,protocols,anamnesis}` autenticados por chave (hash sha256, header Bearer), servindo só `published`; client admin server-only; `last_used_at`. Módulo de chaves: criar (revela uma vez), rotacionar, revogar, prefixo mascarado. Migration `api_keys.key_prefix`. Validado: 401 sem chave, dados só publicados com chave; produto rascunho corretamente omitido. Commitado na `dev`.
+- **2026-07-03** — **Promoções** (`/promotions`): CRUD de cupons (código, percentual/valor fixo, valor, período de vigência com estado ativa/agendada/expirada, publish). Validado criando RESET10 (10%, publicado).
