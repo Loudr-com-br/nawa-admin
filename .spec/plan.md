@@ -4,7 +4,7 @@
 > Ordem de construção baseada na seção 11 do [`spec.md`](spec.md).
 > Complementos: [`escalabilidade.md`](escalabilidade.md) · [`storefront-api.md`](storefront-api.md)
 >
-> **Última atualização:** 2026-07-03 (Dashboard analítico — visão geral)
+> **Última atualização:** 2026-07-03 (Storefront: cache + purge-on-publish; docs)
 
 ## Legenda
 
@@ -84,9 +84,9 @@ Módulo mais estratégico.
 - [x] Contrato de leitura (`/api/storefront/{catalog,protocols,anamnesis}`) — só `status = published`
 - [x] Geração/revogação/rotação de chaves (guardadas como hash, escopo leitura, `last_used_at`)
 - [x] Endpoints (Route Handlers) validando a chave via header Bearer; middleware libera a rota
-- [x] Escala (quick wins): cache de borda (`s-maxage`+`stale-while-revalidate`+`Vary`), `last_used_at` com throttle (não grava por request) — ver [`escalabilidade.md`](escalabilidade.md)
+- [x] Escala: cache de borda (`s-maxage`+`stale-while-revalidate`+`Vary`), `last_used_at` com throttle, **purge-on-publish** (cache tags + `purgeCache`) — ver [`escalabilidade.md`](escalabilidade.md)
 - [x] Guia da API para o front: [`storefront-api.md`](storefront-api.md)
-- [ ] Purge/revalidate no publish; rate limiting; versionamento `v1`
+- [ ] Rate limiting por chave; versionamento `v1`
 - [ ] Mover para Netlify Functions no deploy (hoje Route Handlers do Next servem o mesmo contrato)
 
 ### 8. Promoções (`/promotions`) — §5.10
@@ -153,3 +153,5 @@ Módulo mais estratégico.
 - **2026-07-03** — **Dashboard** (`/dashboard`): métricas reais agregadas do Supabase (16 pedidos, 9 assinaturas ativas, MRR R$ 4.510, 16 pacientes), lista de pedidos recentes clicável e card de alertas (inadimplentes + sync Botane). Fecha os 12 módulos de núcleo do spec em dados reais. Commitado na `dev`.
 - **2026-07-03** — **Configuração** (`/settings`): gestão de usuários internos e papéis (convidar cria auth user + users_internal, trocar papel, ativar/desativar), restrito ao super_admin (guard na página + nas actions). Aba de integrações informativa. Validado convidando medico.teste@nawahealth.com como Médico.
 - **2026-07-03** — **Auditoria** (`/audit`): helper `logAudit` (ator, e-mail, ação, entidade, changes, IP, horário; best-effort). Instrumentadas ações sensíveis (usuários, chaves de API, assinaturas). Trilha imutável restrita ao super_admin. Migration `audit_log.actor_email`. Validado pausando assinatura → registro apareceu na trilha.
+- **2026-07-03** — **Dashboard analítico** (`/dashboard`): reformulado no estilo "visão geral" (receita, ticket médio, pedidos, cancelados com delta; seletor de período; gráficos MUI X Charts; produtos com maior receita; funil de pedidos). Seed de ~180 pedidos em 60 dias (`npm run seed:orders`). Âncora "agora" no relógio real. Deploy em produção (Netlify) funcionando após configurar as envs do Supabase. `main` = `dev` (promovido via force-push).
+- **2026-07-03** — **Escala da Storefront**: cache de borda (`s-maxage`+`stale-while-revalidate`+`Vary`), `last_used_at` com throttle, **purge-on-publish** (cache tags + `purgeCache` da Netlify nas ações de publicação). Docs `escalabilidade.md` e `storefront-api.md`. README atualizado.
