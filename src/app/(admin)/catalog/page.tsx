@@ -1,10 +1,24 @@
-import ModulePlaceholder from "@/components/ModulePlaceholder";
+import {
+  listPlans,
+  listProducts,
+  listJourneyOptions,
+  listRefOptions,
+} from "@/lib/catalog/queries";
+import CatalogClient from "./CatalogClient";
 
-export default function Page() {
+export default async function CatalogPage() {
+  const [plans, products, journeys, refOptions] = await Promise.all([
+    listPlans(),
+    listProducts(),
+    listJourneyOptions(),
+    listRefOptions(),
+  ]);
   return (
-    <ModulePlaceholder
-      title="Catálogo"
-      description="Gestão de planos e produtos comerciais: preço, recorrência, inclusões, add-ons e estado de publicação."
+    <CatalogClient
+      plans={plans}
+      products={products}
+      journeys={journeys}
+      refOptions={refOptions}
     />
   );
 }

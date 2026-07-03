@@ -226,7 +226,7 @@ export type Database = {
           is_addon: boolean
           name: string
           price: number
-          ref_id: string
+          ref_id: string | null
           ref_type: Database["public"]["Enums"]["commercial_ref_type"]
           status: Database["public"]["Enums"]["content_status"]
           updated_at: string
@@ -237,7 +237,7 @@ export type Database = {
           is_addon?: boolean
           name: string
           price?: number
-          ref_id: string
+          ref_id?: string | null
           ref_type: Database["public"]["Enums"]["commercial_ref_type"]
           status?: Database["public"]["Enums"]["content_status"]
           updated_at?: string
@@ -248,7 +248,7 @@ export type Database = {
           is_addon?: boolean
           name?: string
           price?: number
-          ref_id?: string
+          ref_id?: string | null
           ref_type?: Database["public"]["Enums"]["commercial_ref_type"]
           status?: Database["public"]["Enums"]["content_status"]
           updated_at?: string
