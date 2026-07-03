@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { generateApiKey } from "@/lib/storefront/keys";
+import { logAudit } from "@/lib/audit/log";
 
 export type ActionResult =
   | { ok: true; raw?: string }
@@ -28,6 +29,7 @@ export async function createKey(name: string): Promise<ActionResult> {
     created_by: await currentUserId(),
   });
   if (error) return { ok: false, error: error.message };
+  await logAudit("api_key.create", { entityType: "api_key", changes: { name: name.trim(), prefix } });
   revalidatePath("/api-keys");
   return { ok: true, raw };
 }
@@ -36,6 +38,7 @@ export async function revokeKey(id: string): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase.from("api_keys").update({ status: "revoked" }).eq("id", id);
   if (error) return { ok: false, error: error.message };
+  await logAudit("api_key.revoke", { entityType: "api_key", entityId: id });
   revalidatePath("/api-keys");
   return { ok: true };
 }
@@ -64,6 +67,7 @@ export async function rotateKey(id: string): Promise<ActionResult> {
   const { error: revErr } = await supabase.from("api_keys").update({ status: "revoked" }).eq("id", id);
   if (revErr) return { ok: false, error: revErr.message };
 
+  await logAudit("api_key.rotate", { entityType: "api_key", entityId: id, changes: { name: old.name, new_prefix: prefix } });
   revalidatePath("/api-keys");
   return { ok: true, raw };
 }

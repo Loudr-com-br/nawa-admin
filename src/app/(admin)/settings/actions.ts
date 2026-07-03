@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/supabase/auth";
+import { logAudit } from "@/lib/audit/log";
 import type { AppRole } from "@/lib/supabase/roles";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -57,6 +58,7 @@ export async function inviteUser(email: string, role: AppRole): Promise<ActionRe
     .upsert({ id: userId, email: clean, role, status: "active" }, { onConflict: "id" });
   if (upErr) return { ok: false, error: upErr.message };
 
+  await logAudit("user.invite", { entityType: "users_internal", entityId: userId, changes: { email: clean, role } });
   revalidatePath("/settings");
   return { ok: true };
 }
@@ -67,6 +69,7 @@ export async function setUserRole(id: string, role: AppRole): Promise<ActionResu
   const supabase = await createClient();
   const { error } = await supabase.from("users_internal").update({ role }).eq("id", id);
   if (error) return { ok: false, error: error.message };
+  await logAudit("user.role_change", { entityType: "users_internal", entityId: id, changes: { role } });
   revalidatePath("/settings");
   return { ok: true };
 }
@@ -77,6 +80,7 @@ export async function setUserStatus(id: string, status: "active" | "inactive"): 
   const supabase = await createClient();
   const { error } = await supabase.from("users_internal").update({ status }).eq("id", id);
   if (error) return { ok: false, error: error.message };
+  await logAudit("user.status_change", { entityType: "users_internal", entityId: id, changes: { status } });
   revalidatePath("/settings");
   return { ok: true };
 }

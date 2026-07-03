@@ -3,7 +3,7 @@
 > Documento vivo. Atualizar conforme avançamos.
 > Ordem de construção baseada na seção 11 do [`spec.md`](spec.md).
 >
-> **Última atualização:** 2026-07-03 (Configuração de sistema — usuários e papéis)
+> **Última atualização:** 2026-07-03 (Auditoria & LGPD — trilha imutável)
 
 ## Legenda
 
@@ -107,7 +107,8 @@ Módulo mais estratégico.
 
 ## Fase 2 — Segurança, pagamento e conformidade — §8
 
-- [ ] Auditoria (`/audit`): trilha imutável de dado clínico
+- [x] Auditoria (`/audit`): trilha imutável (ator, ação, entidade, mudança, IP, horário) — instrumentadas ações de usuários, chaves e assinaturas; restrito ao super_admin
+- [ ] Instrumentar mais ações (publicação, dado clínico) e leitura de dado sensível
 - [ ] Endurecimento de RLS por papel
 - [ ] **Pagamento (Pagar.me)**: tokenização, cobrança server-side, webhooks assinados, idempotência
 - [ ] LGPD: consentimento, exclusão/portabilidade, retenção mínima
@@ -147,3 +148,4 @@ Módulo mais estratégico.
 - **2026-07-03** — **Assinaturas** (`/subscriptions`): lista + operações (pausar/reativar/retentar/cancelar/mudar plano) via Server Actions, filtro por status. Seed de 16 assinaturas (`npm run seed:subscriptions`). **Pacientes** (`/patients`): lista + ficha 360º (`/patients/[id]`) agregando cadastro, assinaturas, histórico de pedidos e status clínico. Validado pausando assinatura e abrindo ficha. Commitado na `dev`.
 - **2026-07-03** — **Dashboard** (`/dashboard`): métricas reais agregadas do Supabase (16 pedidos, 9 assinaturas ativas, MRR R$ 4.510, 16 pacientes), lista de pedidos recentes clicável e card de alertas (inadimplentes + sync Botane). Fecha os 12 módulos de núcleo do spec em dados reais. Commitado na `dev`.
 - **2026-07-03** — **Configuração** (`/settings`): gestão de usuários internos e papéis (convidar cria auth user + users_internal, trocar papel, ativar/desativar), restrito ao super_admin (guard na página + nas actions). Aba de integrações informativa. Validado convidando medico.teste@nawahealth.com como Médico.
+- **2026-07-03** — **Auditoria** (`/audit`): helper `logAudit` (ator, e-mail, ação, entidade, changes, IP, horário; best-effort). Instrumentadas ações sensíveis (usuários, chaves de API, assinaturas). Trilha imutável restrita ao super_admin. Migration `audit_log.actor_email`. Validado pausando assinatura → registro apareceu na trilha.
