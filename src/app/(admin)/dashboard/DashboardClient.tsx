@@ -13,7 +13,7 @@ import MenuItem from "@mui/material/MenuItem";
 import ArrowDropUpRoundedIcon from "@mui/icons-material/ArrowDropUpRounded";
 import ArrowDropDownRoundedIcon from "@mui/icons-material/ArrowDropDownRounded";
 import FiberManualRecordRoundedIcon from "@mui/icons-material/FiberManualRecordRounded";
-import AreaChart from "./AreaChart";
+import { LineChart } from "@mui/x-charts/LineChart";
 import { formatBRL } from "@/lib/orders/format";
 import {
   periodDays,
@@ -211,7 +211,16 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
           <Card>
             <CardContent>
               <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Pedidos por dia</Typography>
-              <AreaChart labels={view.labels} values={view.countSeries} color={BRAND} />
+              <Box sx={{ height: 220 }}>
+                <LineChart
+                  xAxis={[{ data: view.labels, scaleType: "point" }]}
+                  series={[{ data: view.countSeries, color: BRAND, area: true, showMark: false, curve: "monotoneX" }]}
+                  height={220}
+                  margin={{ left: 40, right: 12, top: 12, bottom: 24 }}
+                  slotProps={{ legend: { hidden: true } }}
+                  sx={{ "& .MuiAreaElement-root": { fillOpacity: 0.12 } }}
+                />
+              </Box>
             </CardContent>
           </Card>
         </Grid>
@@ -219,7 +228,16 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
           <Card>
             <CardContent>
               <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Receita por dia</Typography>
-              <AreaChart labels={view.labels} values={view.revSeries} color="#0619AD" valueFormatter={(v) => formatBRL(v)} />
+              <Box sx={{ height: 220 }}>
+                <LineChart
+                  xAxis={[{ data: view.labels, scaleType: "point" }]}
+                  series={[{ data: view.revSeries, color: "#0619AD", area: true, showMark: false, curve: "monotoneX", valueFormatter: (v) => formatBRL(v ?? 0) }]}
+                  height={220}
+                  margin={{ left: 56, right: 12, top: 12, bottom: 24 }}
+                  slotProps={{ legend: { hidden: true } }}
+                  sx={{ "& .MuiAreaElement-root": { fillOpacity: 0.1 } }}
+                />
+              </Box>
             </CardContent>
           </Card>
         </Grid>
