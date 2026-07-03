@@ -10,7 +10,8 @@
     "db:types": "supabase gen types typescript --linked --schema public > src/lib/supabase/database.types.ts",
     "seed:admin": "node --env-file=.env.local scripts/seed-admin.mjs",
     "seed:data": "node --env-file=.env.local scripts/seed-data.mjs",
-    "seed:anamnesis": "node --env-file=.env.local scripts/seed-anamnesis.mjs"
+    "seed:anamnesis": "node --env-file=.env.local scripts/seed-anamnesis.mjs",
+    "seed:subscriptions": "node --env-file=.env.local scripts/seed-subscriptions.mjs"
   },
   "dependencies": {
     "@emotion/cache": "^11.14.0",

@@ -1,10 +1,7 @@
-import ModulePlaceholder from "@/components/ModulePlaceholder";
+import { listPatients } from "@/lib/patients/queries";
+import PatientsClient from "./PatientsClient";
 
-export default function Page() {
-  return (
-    <ModulePlaceholder
-      title="Pacientes"
-      description="O paciente como pessoa: cadastro, assinaturas, histórico, anamnese, protocolos e status clínico. Acesso restrito por papel."
-    />
-  );
+export default async function PatientsPage() {
+  const patients = await listPatients();
+  return <PatientsClient patients={patients} />;
 }

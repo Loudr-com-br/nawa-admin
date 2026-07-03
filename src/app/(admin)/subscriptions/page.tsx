@@ -1,10 +1,10 @@
-import ModulePlaceholder from "@/components/ModulePlaceholder";
+import { listSubscriptions, listPlanOptions } from "@/lib/subscriptions/queries";
+import SubscriptionsClient from "./SubscriptionsClient";
 
-export default function Page() {
-  return (
-    <ModulePlaceholder
-      title="Assinaturas"
-      description="Operação da recorrência: estado, upgrade, downgrade, pausa, cancelamento, retentativa de cobrança e churn."
-    />
-  );
+export default async function SubscriptionsPage() {
+  const [subscriptions, planOptions] = await Promise.all([
+    listSubscriptions(),
+    listPlanOptions(),
+  ]);
+  return <SubscriptionsClient subscriptions={subscriptions} planOptions={planOptions} />;
 }
