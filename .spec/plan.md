@@ -3,7 +3,7 @@
 > Documento vivo. Atualizar conforme avançamos.
 > Ordem de construção baseada na seção 11 do [`spec.md`](spec.md).
 >
-> **Última atualização:** 2026-07-03 (Auditoria & LGPD — trilha imutável)
+> **Última atualização:** 2026-07-03 (Dashboard analítico — visão geral)
 
 ## Legenda
 

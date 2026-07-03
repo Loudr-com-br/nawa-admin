@@ -1,71 +1,39 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import type { OrderStatus } from "@/lib/orders/types";
+import type { DashOrder, DashboardData } from "./types";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-export interface RecentOrder {
-  id: string;
-  number: string;
-  patientName: string;
-  status: OrderStatus;
-  total: number;
-  createdAt: string;
-}
-
-export interface DashboardMetrics {
-  orderCount: number;
-  activeSubscriptions: number;
-  mrr: number;
-  pastDue: number;
-  patientCount: number;
-  recentOrders: RecentOrder[];
-  botaneAlerts: number;
-}
-
-async function count(supabase: any, table: string, filter?: (q: any) => any): Promise<number> {
-  let q = supabase.from(table).select("id", { count: "exact", head: true });
-  if (filter) q = filter(q);
-  const { count } = await q;
-  return count ?? 0;
-}
-
-export async function getDashboardMetrics(): Promise<DashboardMetrics> {
+export async function getDashboardData(): Promise<DashboardData> {
   const supabase = await createClient();
 
-  const [orderCount, pastDue, patientCount, botaneAlerts] = await Promise.all([
-    count(supabase, "orders"),
-    count(supabase, "subscriptions", (q: any) => q.eq("status", "past_due")),
-    count(supabase, "patients"),
-    count(supabase, "botane_sync_log", (q: any) => q.neq("status", "success")),
-  ]);
-
-  // Assinaturas ativas + MRR (soma do preço-base dos planos ativos).
-  const { data: activeSubs } = await supabase
-    .from("subscriptions")
-    .select("id, plan:plans(base_price)")
-    .eq("status", "active");
-  const activeSubscriptions = activeSubs?.length ?? 0;
-  const mrr = (activeSubs ?? []).reduce(
-    (sum: number, s: any) => sum + Number(s.plan?.base_price ?? 0),
-    0
-  );
-
-  // Pedidos recentes.
-  const { data: recent } = await supabase
+  const { data: orderRows, error } = await supabase
     .from("orders")
-    .select("id, status, total, created_at, patient:patients(name)")
-    .order("created_at", { ascending: false })
-    .limit(6);
+    .select("total, status, payment_status, created_at, order_items(name, unit_price, quantity, is_glp1)")
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(`getDashboardData: ${error.message}`);
 
-  const recentOrders: RecentOrder[] = (recent ?? []).map((o: any) => ({
-    id: o.id,
-    number: `#NAWA-${String(o.id).slice(0, 4).toUpperCase()}`,
-    patientName: o.patient?.name ?? "—",
-    status: o.status,
+  const orders: DashOrder[] = (orderRows ?? []).map((o: any) => ({
     total: Number(o.total),
+    status: o.status,
+    paymentStatus: o.payment_status,
     createdAt: o.created_at,
+    items: (o.order_items ?? []).map((i: any) => ({
+      name: i.name,
+      unitPrice: Number(i.unit_price),
+      quantity: i.quantity,
+      isGlp1: i.is_glp1,
+    })),
   }));
 
-  return { orderCount, activeSubscriptions, mrr, pastDue, patientCount, recentOrders, botaneAlerts };
+  const [{ count: activeSubscriptions }, { count: patientCount }] = await Promise.all([
+    supabase.from("subscriptions").select("id", { count: "exact", head: true }).eq("status", "active"),
+    supabase.from("patients").select("id", { count: "exact", head: true }),
+  ]);
+
+  return {
+    orders,
+    activeSubscriptions: activeSubscriptions ?? 0,
+    patientCount: patientCount ?? 0,
+  };
 }
