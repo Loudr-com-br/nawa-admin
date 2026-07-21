@@ -1,25 +1,23 @@
-import type { ContentStatus } from "@/lib/catalog/types";
+// Protocolos v2 — o protocolo é um KIT: curadoria NAWA de itens do catálogo,
+// com preço próprio (spec catalogo-protocolos-v2 §5, §6, §8).
+import type { ContentStatus, ItemType, Visibility } from "@/lib/catalog/types";
 
-export type PharmaceuticalForm =
-  | "capsule"
-  | "sachet"
-  | "sublingual"
-  | "topical"
-  | "other";
+export type ClaimStatus = "draft" | "pending_review" | "approved" | "rejected";
+export type PriceSource = "sum" | "manual";
 
-export type Supplier = "botane" | "partner";
-
-export interface Formula {
-  id: string;
-  protocolId: string;
+/** Item do kit — linha de protocol_items já unida ao item do catálogo. */
+export interface ProtocolMember {
+  id: string; // protocol_items.id
+  itemId: string;
+  quantity: number;
+  order: number;
+  // snapshot do item (leitura)
   name: string;
-  pharmaceuticalForm: PharmaceuticalForm;
-  dosage: string;
-  supplier: Supplier;
+  price: number;
+  visibility: Visibility;
+  itemType: ItemType;
+  supplierName: string;
   isGlp1: boolean;
-  externalRef: string | null;
-  eligibilityNotes: string;
-  createdAt: string;
 }
 
 export interface Protocol {
@@ -27,33 +25,52 @@ export interface Protocol {
   slug: string;
   name: string;
   clinicalDescription: string;
-  externalRef: string | null;
+  price: number;
+  priceSource: PriceSource;
+  visibility: Visibility;
+  claimStatus: ClaimStatus;
   status: ContentStatus;
-  formulaCount: number;
+  version: number;
+  itemCount: number;
+  /** Soma atual dos itens (preço × quantidade) — base do aviso de deriva. */
+  itemsSum: number;
   createdAt: string;
 }
 
 export interface ProtocolDetail extends Protocol {
-  formulas: Formula[];
+  claimInternal: string;
+  claimPublic: string;
+  claimReviewedAt: string | null;
+  pageContent: string;
+  members: ProtocolMember[];
 }
 
-export const pharmaceuticalForms: PharmaceuticalForm[] = [
-  "capsule",
-  "sachet",
-  "sublingual",
-  "topical",
-  "other",
-];
-
-export const formLabels: Record<PharmaceuticalForm, string> = {
-  capsule: "Cápsula",
-  sachet: "Sachê",
-  sublingual: "Sublingual",
-  topical: "Tópico",
-  other: "Outro",
+export const claimStatusLabels: Record<ClaimStatus, string> = {
+  draft: "Rascunho",
+  pending_review: "Em revisão",
+  approved: "Aprovado",
+  rejected: "Rejeitado",
 };
 
-export const supplierLabels: Record<Supplier, string> = {
-  botane: "Botane",
-  partner: "Parceiro",
+/** Cor semântica do estado do claim (bloqueio regulatório — mostrar com destaque §8). */
+export const claimStatusColor: Record<ClaimStatus, "default" | "warning" | "success" | "error"> = {
+  draft: "default",
+  pending_review: "warning",
+  approved: "success",
+  rejected: "error",
 };
+
+export const priceSourceLabels: Record<PriceSource, string> = {
+  sum: "Soma dos itens",
+  manual: "Manual",
+};
+
+/** Diferença entre a soma atual dos itens e o preço do kit. >0 = kit abaixo da soma. */
+export function priceDrift(price: number, itemsSum: number): number {
+  return itemsSum - price;
+}
+
+/** Há deriva relevante (arredonda a centavos para evitar ruído de float). */
+export function hasDrift(price: number, itemsSum: number): boolean {
+  return Math.abs(priceDrift(price, itemsSum)) >= 0.01;
+}

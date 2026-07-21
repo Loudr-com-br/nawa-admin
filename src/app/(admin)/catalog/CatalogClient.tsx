@@ -21,7 +21,7 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import { DataTable, type Column } from "@/components/table/DataTable";
 import PublishStatusChip from "@/components/PublishStatusChip";
 import Glp1Tag from "@/components/orders/Glp1Tag";
-import { MedicalOnlyChip } from "./VisibilityChip";
+import { MedicalOnlyChip } from "@/components/VisibilityChip";
 import {
   formatBRL,
   computeMargin,

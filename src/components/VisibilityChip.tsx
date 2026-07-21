@@ -2,7 +2,7 @@ import Box from "@mui/material/Box";
 
 /**
  * Chip discreto de destaque para itens/protocolos `medical_only` (spec §12).
- * Leve, sem peso — só marca que o item não vai à vitrine pública.
+ * Leve, sem peso — só marca que não vai à vitrine pública.
  */
 export function MedicalOnlyChip() {
   return (
