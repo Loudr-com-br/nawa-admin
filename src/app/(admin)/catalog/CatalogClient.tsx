@@ -7,9 +7,6 @@ import Card from "@mui/material/Card";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
-import Chip from "@mui/material/Chip";
-import Tabs from "@mui/material/Tabs";
-import Tab from "@mui/material/Tab";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
@@ -23,162 +20,141 @@ import InputAdornment from "@mui/material/InputAdornment";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import { DataTable, type Column } from "@/components/table/DataTable";
 import PublishStatusChip from "@/components/PublishStatusChip";
+import Glp1Tag from "@/components/orders/Glp1Tag";
+import { MedicalOnlyChip } from "./VisibilityChip";
 import {
-  billingIntervals,
-  billingLabels,
   formatBRL,
-  type Plan,
-  type CommercialProduct,
-  type RefOption,
+  computeMargin,
+  forcesMedicalOnly,
+  itemTypes,
+  itemTypeLabels,
+  pharmaceuticalForms,
+  formLabels,
+  visibilityLabels,
+  type Item,
+  type ItemType,
+  type PharmaceuticalForm,
+  type SupplierOption,
+  type Visibility,
 } from "@/lib/catalog/types";
-import {
-  savePlan,
-  deletePlan,
-  saveProduct,
-  deleteProduct,
-} from "./actions";
+import { saveItem } from "./actions";
 import { useToast } from "@/components/ToastProvider";
 
-function formatDate(iso: string) {
-  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));
+function slugify(s: string) {
+  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-// ── Colunas ──
-const planColumns: Column<Plan>[] = [
-  { id: "name", label: "Nome", sortable: true, sortAccessor: (p) => p.name, render: (p) => <Typography variant="body2" sx={{ fontWeight: 500 }}>{p.name}</Typography> },
-  { id: "journey", label: "Jornada", sortable: true, sortAccessor: (p) => p.journeyName, render: (p) => <Typography variant="body2" color="text.secondary">{p.journeyName}</Typography> },
-  { id: "price", label: "Preço base", align: "right", sortable: true, sortAccessor: (p) => p.basePrice, render: (p) => <Typography variant="body2" sx={{ fontWeight: 500 }}>{formatBRL(p.basePrice)}</Typography> },
-  { id: "billing", label: "Recorrência", sortable: true, sortAccessor: (p) => p.billingInterval, render: (p) => <Typography variant="body2" color="text.secondary">{billingLabels[p.billingInterval] ?? p.billingInterval}</Typography> },
-  { id: "status", label: "Status", sortable: true, sortAccessor: (p) => p.status, render: (p) => <PublishStatusChip status={p.status} /> },
-  { id: "createdAt", label: "Criado", sortable: true, sortAccessor: (p) => new Date(p.createdAt).getTime(), render: (p) => <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>{formatDate(p.createdAt)}</Typography> },
+function fmtMargin(price: number, cost: number | null) {
+  const m = computeMargin(price, cost);
+  return m == null ? "—" : `${m.toFixed(0)}%`;
+}
+
+const columns: Column<Item>[] = [
+  {
+    id: "name", label: "Item", sortable: true, sortAccessor: (i) => i.name,
+    render: (i) => (
+      <Stack direction="row" spacing={0.75} alignItems="center">
+        <Typography variant="body2" sx={{ fontWeight: 500 }}>{i.name}</Typography>
+        {i.isGlp1 && <Glp1Tag />}
+      </Stack>
+    ),
+  },
+  {
+    id: "supplier", label: "Fornecedor", sortable: true, sortAccessor: (i) => i.supplierName,
+    render: (i) => <Typography variant="body2" color="text.secondary">{i.supplierName}</Typography>,
+  },
+  {
+    id: "type", label: "Tipo", sortable: true, sortAccessor: (i) => i.itemType,
+    render: (i) => <Typography variant="body2" color="text.secondary">{itemTypeLabels[i.itemType]}</Typography>,
+  },
+  {
+    id: "price", label: "Preço", align: "right", sortable: true, sortAccessor: (i) => i.price,
+    render: (i) => <Typography variant="body2" sx={{ fontWeight: 500 }}>{formatBRL(i.price)}</Typography>,
+  },
+  {
+    id: "margin", label: "Margem", align: "right", sortable: true,
+    sortAccessor: (i) => computeMargin(i.price, i.cost) ?? -1,
+    render: (i) => <Typography variant="body2" color="text.secondary">{fmtMargin(i.price, i.cost)}</Typography>,
+  },
+  {
+    id: "visibility", label: "Visibilidade", sortable: true, sortAccessor: (i) => i.visibility,
+    render: (i) => i.visibility === "medical_only"
+      ? <MedicalOnlyChip />
+      : <Typography variant="body2" color="text.secondary">Pública</Typography>,
+  },
+  {
+    id: "status", label: "Status", sortable: true, sortAccessor: (i) => i.status,
+    render: (i) => <PublishStatusChip status={i.status} />,
+  },
 ];
 
-const productColumns: Column<CommercialProduct>[] = [
-  { id: "name", label: "Nome", sortable: true, sortAccessor: (p) => p.name, render: (p) => <Typography variant="body2" sx={{ fontWeight: 500 }}>{p.name}</Typography> },
-  { id: "ref", label: "Referência", sortable: true, sortAccessor: (p) => (p.refId ? p.refType : ""), render: (p) => <Typography variant="body2" color={p.refId ? "text.secondary" : "text.disabled"}>{p.refId ? (p.refType === "plan" ? "Plano" : "Fórmula") : "—"}</Typography> },
-  { id: "price", label: "Preço", align: "right", sortable: true, sortAccessor: (p) => p.price, render: (p) => <Typography variant="body2" sx={{ fontWeight: 500 }}>{formatBRL(p.price)}</Typography> },
-  { id: "addon", label: "Add-on", sortable: true, sortAccessor: (p) => (p.isAddon ? 1 : 0), render: (p) => (p.isAddon ? <Chip label="Add-on" size="small" variant="outlined" /> : <Typography variant="body2" color="text.disabled">—</Typography>) },
-  { id: "status", label: "Status", sortable: true, sortAccessor: (p) => p.status, render: (p) => <PublishStatusChip status={p.status} /> },
-];
-
-const emptyPlan = {
-  name: "", slug: "", journeyId: "", basePrice: "", billingInterval: "monthly", inclusions: "", published: false,
-};
-const emptyProduct = {
-  name: "", refId: "", price: "", isAddon: false, published: false,
+const emptyForm = {
+  name: "", slug: "", supplierId: "", itemType: "manipulado" as ItemType,
+  pharmaceuticalForm: "capsula" as PharmaceuticalForm,
+  price: "", cost: "", visibility: "medical_only" as Visibility,
+  sellsStandalone: true, isGlp1: false, description: "", compositionRaw: "",
+  externalRef: "", published: false,
 };
 
 export default function CatalogClient({
-  plans, products, journeys, refOptions,
+  items, suppliers,
 }: {
-  plans: Plan[];
-  products: CommercialProduct[];
-  journeys: { id: string; name: string }[];
-  refOptions: RefOption[];
+  items: Item[];
+  suppliers: SupplierOption[];
 }) {
   const router = useRouter();
   const toast = useToast();
-  const [tab, setTab] = useState(0);
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
 
-  // Plan dialog
-  const [planOpen, setPlanOpen] = useState(false);
-  const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
-  const [planForm, setPlanForm] = useState(emptyPlan);
-
-  // Product dialog
-  const [prodOpen, setProdOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<CommercialProduct | null>(null);
-  const [prodForm, setProdForm] = useState(emptyProduct);
+  const medLocked = forcesMedicalOnly(form.itemType);
 
   function openNew() {
     setError(null);
-    setConfirmDelete(false);
-    if (tab === 0) {
-      setEditingPlan(null);
-      setPlanForm(emptyPlan);
-      setPlanOpen(true);
-    } else {
-      setEditingProduct(null);
-      setProdForm(emptyProduct);
-      setProdOpen(true);
-    }
+    setForm({ ...emptyForm, supplierId: suppliers[0]?.id ?? "" });
+    setOpen(true);
   }
 
-  function openPlan(p: Plan) {
-    setError(null); setConfirmDelete(false);
-    setEditingPlan(p);
-    setPlanForm({
-      name: p.name, slug: p.slug, journeyId: p.journeyId ?? "",
-      basePrice: String(p.basePrice), billingInterval: p.billingInterval,
-      inclusions: p.inclusions.join("\n"), published: p.status === "published",
-    });
-    setPlanOpen(true);
+  function setName(name: string) {
+    setForm((f) => ({ ...f, name, slug: f.slug || slugify(name) }));
   }
 
-  function openProduct(p: CommercialProduct) {
-    setError(null); setConfirmDelete(false);
-    setEditingProduct(p);
-    setProdForm({ name: p.name, refId: p.refId ?? "", price: String(p.price), isAddon: p.isAddon, published: p.status === "published" });
-    setProdOpen(true);
+  function setItemType(itemType: ItemType) {
+    setForm((f) => ({
+      ...f, itemType,
+      visibility: forcesMedicalOnly(itemType) ? "medical_only" : f.visibility,
+    }));
   }
 
-  async function handleSavePlan() {
+  async function handleSave() {
     setError(null);
-    if (!planForm.name.trim() || !planForm.slug.trim()) { setError("Preencha nome e slug."); return; }
+    if (!form.name.trim() || !form.slug.trim()) { setError("Preencha nome e slug."); return; }
+    if (!form.supplierId) { setError("Selecione um fornecedor."); return; }
     setSaving(true);
-    const result = await savePlan(editingPlan?.id ?? null, {
-      name: planForm.name,
-      slug: planForm.slug,
-      journeyId: planForm.journeyId || null,
-      basePrice: Number(planForm.basePrice) || 0,
-      billingInterval: planForm.billingInterval,
-      inclusions: planForm.inclusions.split("\n").map((s) => s.trim()).filter(Boolean),
-      status: planForm.published ? "published" : "draft",
+    const result = await saveItem(null, {
+      name: form.name,
+      slug: form.slug,
+      supplierId: form.supplierId,
+      itemType: form.itemType,
+      visibility: medLocked ? "medical_only" : form.visibility,
+      sellsStandalone: form.sellsStandalone,
+      isGlp1: form.isGlp1,
+      price: Number(form.price) || 0,
+      pharmaceuticalForm: form.pharmaceuticalForm,
+      description: form.description || null,
+      cost: form.cost === "" ? null : Number(form.cost),
+      externalRef: form.externalRef || null,
+      compositionRaw: form.compositionRaw || null,
+      status: form.published ? "published" : "draft",
     });
     setSaving(false);
     if (!result.ok) { setError(result.error); return; }
-    setPlanOpen(false); toast.success(editingPlan ? "Plano atualizado" : "Plano criado"); router.refresh();
-  }
-
-  async function handleDeletePlan() {
-    if (!editingPlan) return;
-    if (!confirmDelete) { setConfirmDelete(true); return; }
-    setSaving(true);
-    const result = await deletePlan(editingPlan.id);
-    setSaving(false);
-    if (!result.ok) { setError(result.error); return; }
-    setPlanOpen(false); toast.success("Plano excluído"); router.refresh();
-  }
-
-  async function handleSaveProduct() {
-    setError(null);
-    if (!prodForm.name.trim()) { setError("Preencha o nome."); return; }
-    const ref = refOptions.find((r) => r.id === prodForm.refId);
-    setSaving(true);
-    const result = await saveProduct(editingProduct?.id ?? null, {
-      name: prodForm.name,
-      refType: ref?.refType ?? "plan",
-      refId: prodForm.refId || null,
-      price: Number(prodForm.price) || 0,
-      isAddon: prodForm.isAddon,
-      status: prodForm.published ? "published" : "draft",
-    });
-    setSaving(false);
-    if (!result.ok) { setError(result.error); return; }
-    setProdOpen(false); toast.success(editingProduct ? "Produto atualizado" : "Produto criado"); router.refresh();
-  }
-
-  async function handleDeleteProduct() {
-    if (!editingProduct) return;
-    if (!confirmDelete) { setConfirmDelete(true); return; }
-    setSaving(true);
-    const result = await deleteProduct(editingProduct.id);
-    setSaving(false);
-    if (!result.ok) { setError(result.error); return; }
-    setProdOpen(false); toast.success("Produto excluído"); router.refresh();
+    setOpen(false);
+    toast.success("Item criado");
+    router.refresh();
   }
 
   return (
@@ -187,107 +163,74 @@ export default function CatalogClient({
         <Box>
           <Typography variant="h4" component="h1" sx={{ mb: 0.5 }}>Catálogo</Typography>
           <Typography variant="body1" color="text.secondary">
-            Planos e produtos comerciais. Só o que está publicado é servido ao front.
+            Itens e SKUs — o inventário do que existe para vender, venha da Botane, de parceiro ou da NAWA.
           </Typography>
         </Box>
         <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={openNew}>
-          {tab === 0 ? "Novo plano" : "Novo produto"}
+          Novo item
         </Button>
       </Stack>
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
-        <Tab label="Planos" />
-        <Tab label="Produtos" />
-      </Tabs>
+      <Card>
+        <DataTable
+          columns={columns}
+          rows={items}
+          getRowId={(i) => i.id}
+          onRowClick={(i) => router.push(`/catalog/${i.id}`)}
+          initialSort={{ columnId: "name", dir: "asc" }}
+          minWidth={860}
+          countLabel={["item", "itens"]}
+          emptyMessage="Nenhum item ainda. Crie o primeiro."
+        />
+      </Card>
 
-      {tab === 0 && (
-        <Card>
-          <DataTable
-            columns={planColumns}
-            rows={plans}
-            getRowId={(p) => p.id}
-            onRowClick={openPlan}
-            initialSort={{ columnId: "createdAt", dir: "desc" }}
-            minWidth={760}
-            countLabel={["plano", "planos"]}
-            emptyMessage="Nenhum plano ainda. Crie o primeiro."
-          />
-        </Card>
-      )}
-
-      {tab === 1 && (
-        <Card>
-          <DataTable
-            columns={productColumns}
-            rows={products}
-            getRowId={(p) => p.id}
-            onRowClick={openProduct}
-            initialSort={{ columnId: "name", dir: "asc" }}
-            minWidth={680}
-            countLabel={["produto", "produtos"]}
-            emptyMessage="Nenhum produto ainda. Crie o primeiro."
-          />
-        </Card>
-      )}
-
-      {/* Diálogo de Plano */}
-      <Dialog open={planOpen} onClose={() => setPlanOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle sx={{ fontWeight: 600 }}>{editingPlan ? "Editar plano" : "Novo plano"}</DialogTitle>
+      {/* Diálogo de novo item */}
+      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ fontWeight: 600 }}>Novo item</DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 0.5 }}>
-            <TextField label="Nome" value={planForm.name} onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })} placeholder="Plus" autoFocus />
-            <TextField label="Slug" value={planForm.slug} onChange={(e) => setPlanForm({ ...planForm, slug: e.target.value })} placeholder="plus" helperText="Identificador único do plano." />
-            <TextField select label="Jornada" value={planForm.journeyId} onChange={(e) => setPlanForm({ ...planForm, journeyId: e.target.value })}>
-              <MenuItem value="">Nenhuma</MenuItem>
-              {journeys.map((j) => <MenuItem key={j.id} value={j.id}>{j.name}</MenuItem>)}
+            <TextField label="Nome" value={form.name} onChange={(e) => setName(e.target.value)} placeholder="Ômega-3 EPA/DHA" autoFocus />
+            <TextField label="Slug" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="omega-3" helperText="Identificador único." />
+            <TextField select label="Fornecedor" value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })}>
+              {suppliers.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
             </TextField>
             <Stack direction="row" spacing={2}>
-              <TextField label="Preço base" type="number" value={planForm.basePrice} onChange={(e) => setPlanForm({ ...planForm, basePrice: e.target.value })}
-                slotProps={{ input: { startAdornment: <InputAdornment position="start">R$</InputAdornment> } }} />
-              <TextField select label="Recorrência" value={planForm.billingInterval} onChange={(e) => setPlanForm({ ...planForm, billingInterval: e.target.value })} sx={{ minWidth: 160 }}>
-                {billingIntervals.map((b) => <MenuItem key={b} value={b}>{billingLabels[b]}</MenuItem>)}
+              <TextField select label="Tipo" value={form.itemType} onChange={(e) => setItemType(e.target.value as ItemType)} fullWidth>
+                {itemTypes.map((t) => <MenuItem key={t} value={t}>{itemTypeLabels[t]}</MenuItem>)}
+              </TextField>
+              <TextField select label="Forma" value={form.pharmaceuticalForm} onChange={(e) => setForm({ ...form, pharmaceuticalForm: e.target.value as PharmaceuticalForm })} fullWidth>
+                {pharmaceuticalForms.map((f) => <MenuItem key={f} value={f}>{formLabels[f]}</MenuItem>)}
               </TextField>
             </Stack>
-            <TextField label="Inclusões" value={planForm.inclusions} onChange={(e) => setPlanForm({ ...planForm, inclusions: e.target.value })}
-              multiline rows={3} placeholder={"Acompanhamento médico\nGLP-1 incluso"} helperText="Uma inclusão por linha." />
-            <FormControlLabel control={<Switch checked={planForm.published} onChange={(e) => setPlanForm({ ...planForm, published: e.target.checked })} />}
-              label={<Typography variant="body2">Publicado <Typography component="span" variant="caption" color="text.secondary">(visível ao front)</Typography></Typography>} />
-            {error && <Alert severity="error">{error}</Alert>}
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, justifyContent: "space-between" }}>
-          <Box>{editingPlan && <Button color="error" onClick={handleDeletePlan} disabled={saving}>{confirmDelete ? "Confirmar exclusão" : "Excluir"}</Button>}</Box>
-          <Stack direction="row" spacing={1}>
-            <Button onClick={() => setPlanOpen(false)} color="inherit" disabled={saving}>Cancelar</Button>
-            <Button variant="contained" onClick={handleSavePlan} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
-          </Stack>
-        </DialogActions>
-      </Dialog>
-
-      {/* Diálogo de Produto */}
-      <Dialog open={prodOpen} onClose={() => setProdOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle sx={{ fontWeight: 600 }}>{editingProduct ? "Editar produto" : "Novo produto"}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2.5} sx={{ mt: 0.5 }}>
-            <TextField label="Nome" value={prodForm.name} onChange={(e) => setProdForm({ ...prodForm, name: e.target.value })} placeholder="Kit aplicação" autoFocus />
-            <TextField select label="Referência" value={prodForm.refId} onChange={(e) => setProdForm({ ...prodForm, refId: e.target.value })} helperText="Plano ou fórmula que este produto representa.">
-              <MenuItem value="">Nenhuma</MenuItem>
-              {refOptions.map((r) => <MenuItem key={r.id} value={r.id}>{r.label}</MenuItem>)}
+            <Stack direction="row" spacing={2}>
+              <TextField label="Preço (NAWA)" type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} fullWidth
+                slotProps={{ input: { startAdornment: <InputAdornment position="start">R$</InputAdornment> } }} />
+              <TextField label="Custo (fornecedor)" type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} fullWidth
+                helperText="Opcional" slotProps={{ input: { startAdornment: <InputAdornment position="start">R$</InputAdornment> } }} />
+            </Stack>
+            <TextField select label="Visibilidade" value={form.visibility}
+              onChange={(e) => setForm({ ...form, visibility: e.target.value as Visibility })}
+              disabled={medLocked}
+              helperText={medLocked ? "Medicamento é sempre só-médico." : "Pública aparece na vitrine; só-médico não."}>
+              {(["public", "medical_only"] as Visibility[]).map((v) => (
+                <MenuItem key={v} value={v}>{visibilityLabels[v]}</MenuItem>
+              ))}
             </TextField>
-            <TextField label="Preço" type="number" value={prodForm.price} onChange={(e) => setProdForm({ ...prodForm, price: e.target.value })}
-              slotProps={{ input: { startAdornment: <InputAdornment position="start">R$</InputAdornment> } }} />
-            <FormControlLabel control={<Switch checked={prodForm.isAddon} onChange={(e) => setProdForm({ ...prodForm, isAddon: e.target.checked })} />} label={<Typography variant="body2">Add-on</Typography>} />
-            <FormControlLabel control={<Switch checked={prodForm.published} onChange={(e) => setProdForm({ ...prodForm, published: e.target.checked })} />}
-              label={<Typography variant="body2">Publicado <Typography component="span" variant="caption" color="text.secondary">(visível ao front)</Typography></Typography>} />
+            <TextField label="Descrição" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} multiline rows={2} placeholder="Texto descritivo (origem fornecedor)." />
+            <TextField label="Composição" value={form.compositionRaw} onChange={(e) => setForm({ ...form, compositionRaw: e.target.value })} multiline rows={2} placeholder="1000mg — 660mg EPA / 440mg DHA" helperText="Descritiva, como no rótulo." />
+            <TextField label="Ref. externa" value={form.externalRef} onChange={(e) => setForm({ ...form, externalRef: e.target.value })} placeholder="BOT-F-011" />
+            <Stack direction="row" spacing={3}>
+              <FormControlLabel control={<Switch checked={form.sellsStandalone} onChange={(e) => setForm({ ...form, sellsStandalone: e.target.checked })} />} label={<Typography variant="body2">Vende avulso</Typography>} />
+              <FormControlLabel control={<Switch checked={form.isGlp1} onChange={(e) => setForm({ ...form, isGlp1: e.target.checked })} />} label={<Typography variant="body2">GLP-1</Typography>} />
+            </Stack>
+            <FormControlLabel control={<Switch checked={form.published} onChange={(e) => setForm({ ...form, published: e.target.checked })} />}
+              label={<Typography variant="body2">Publicado <Typography component="span" variant="caption" color="text.secondary">(exige preço)</Typography></Typography>} />
             {error && <Alert severity="error">{error}</Alert>}
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, justifyContent: "space-between" }}>
-          <Box>{editingProduct && <Button color="error" onClick={handleDeleteProduct} disabled={saving}>{confirmDelete ? "Confirmar exclusão" : "Excluir"}</Button>}</Box>
-          <Stack direction="row" spacing={1}>
-            <Button onClick={() => setProdOpen(false)} color="inherit" disabled={saving}>Cancelar</Button>
-            <Button variant="contained" onClick={handleSaveProduct} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
-          </Stack>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setOpen(false)} color="inherit" disabled={saving}>Cancelar</Button>
+          <Button variant="contained" onClick={handleSave} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
         </DialogActions>
       </Dialog>
     </Box>

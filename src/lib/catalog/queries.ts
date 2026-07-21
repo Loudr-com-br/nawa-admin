@@ -1,68 +1,73 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import type { Plan, CommercialProduct, RefOption } from "./types";
+import type { Item, ItemCaution, SupplierOption } from "./types";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-export async function listPlans(): Promise<Plan[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("plans")
-    .select("id, journey_id, slug, name, base_price, billing_interval, inclusions, status, created_at, journey:journeys(name)")
-    .order("created_at", { ascending: false });
+const ITEM_SELECT =
+  "id, slug, name, supplier_id, external_ref, item_type, pharmaceutical_form, " +
+  "description, composition, cautions, cost, price, is_glp1, sells_standalone, " +
+  "visibility, status, synced_at, created_at, updated_at, " +
+  "supplier:suppliers(name, type, slug)";
 
-  if (error) throw new Error(`listPlans: ${error.message}`);
-  return (data ?? []).map((r: any) => ({
+function toItem(r: any): Item {
+  return {
     id: r.id,
-    journeyId: r.journey_id,
-    journeyName: r.journey?.name ?? "—",
     slug: r.slug,
     name: r.name,
-    basePrice: Number(r.base_price),
-    billingInterval: r.billing_interval,
-    inclusions: Array.isArray(r.inclusions) ? r.inclusions : [],
+    supplierId: r.supplier_id,
+    supplierName: r.supplier?.name ?? "—",
+    supplierType: r.supplier?.type ?? "internal",
+    supplierSlug: r.supplier?.slug ?? "",
+    externalRef: r.external_ref,
+    itemType: r.item_type,
+    pharmaceuticalForm: r.pharmaceutical_form,
+    description: r.description,
+    composition: (r.composition ?? {}) as Record<string, unknown>,
+    cautions: Array.isArray(r.cautions) ? (r.cautions as ItemCaution[]) : [],
+    cost: r.cost == null ? null : Number(r.cost),
+    price: Number(r.price),
+    isGlp1: r.is_glp1,
+    sellsStandalone: r.sells_standalone,
+    visibility: r.visibility,
     status: r.status,
+    syncedAt: r.synced_at,
     createdAt: r.created_at,
-  }));
+    updatedAt: r.updated_at,
+  };
 }
 
-export async function listProducts(): Promise<CommercialProduct[]> {
+export async function listItems(): Promise<Item[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from("commercial_products")
-    .select("id, ref_type, ref_id, name, price, is_addon, status, created_at")
-    .order("created_at", { ascending: false });
+    .from("items")
+    .select(ITEM_SELECT)
+    .order("name");
+  if (error) throw new Error(`listItems: ${error.message}`);
+  return (data ?? []).map(toItem);
+}
 
-  if (error) throw new Error(`listProducts: ${error.message}`);
+export async function getItemById(id: string): Promise<Item | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("items")
+    .select(ITEM_SELECT)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(`getItemById: ${error.message}`);
+  return data ? toItem(data) : null;
+}
+
+/** Fornecedores para o select do formulário de novo item. */
+export async function listSuppliers(): Promise<SupplierOption[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("suppliers")
+    .select("id, slug, name, type")
+    .eq("status", "active")
+    .order("name");
+  if (error) throw new Error(`listSuppliers: ${error.message}`);
   return (data ?? []).map((r: any) => ({
-    id: r.id,
-    refType: r.ref_type,
-    refId: r.ref_id,
-    name: r.name,
-    price: Number(r.price),
-    isAddon: r.is_addon,
-    status: r.status,
-    createdAt: r.created_at,
+    id: r.id, slug: r.slug, name: r.name, type: r.type,
   }));
-}
-
-/** Jornadas para o select do formulário de plano. */
-export async function listJourneyOptions(): Promise<{ id: string; name: string }[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("journeys").select("id, name").order("name");
-  if (error) throw new Error(`listJourneyOptions: ${error.message}`);
-  return (data ?? []).map((r: any) => ({ id: r.id, name: r.name }));
-}
-
-/** Planos e fórmulas como opções de referência do produto comercial. */
-export async function listRefOptions(): Promise<RefOption[]> {
-  const supabase = await createClient();
-  const [{ data: plans }, { data: formulas }] = await Promise.all([
-    supabase.from("plans").select("id, name").order("name"),
-    supabase.from("formulas").select("id, name").order("name"),
-  ]);
-  return [
-    ...(plans ?? []).map((p: any) => ({ id: p.id, label: `Plano · ${p.name}`, refType: "plan" as const })),
-    ...(formulas ?? []).map((f: any) => ({ id: f.id, label: `Fórmula · ${f.name}`, refType: "formula" as const })),
-  ];
 }
