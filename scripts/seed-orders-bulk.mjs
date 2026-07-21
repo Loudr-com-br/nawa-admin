@@ -1,7 +1,7 @@
 /**
  * Gera muitos pedidos distribuídos nos últimos 60 dias, para dar densidade ao
  * dashboard analítico. Só toca em orders/order_items/order_events — preserva
- * catálogo, protocolos, jornadas, pacientes.
+ * catálogo, protocolos, coleções, pacientes.
  *   node --env-file=.env.local scripts/seed-orders-bulk.mjs [quantidade]
  */
 import { createClient } from "@supabase/supabase-js";
@@ -17,11 +17,9 @@ const NOW = new Date("2026-07-03T18:00:00-03:00");
 
 const { data: patients } = await db.from("patients").select("id");
 const { data: plans } = await db.from("plans").select("id, name, base_price");
-const { data: journeys } = await db.from("journeys").select("id").limit(1);
-if (!patients?.length || !plans?.length || !journeys?.length) {
+if (!patients?.length || !plans?.length) {
   console.error("Rode seed:data antes."); process.exit(1);
 }
-const journeyId = journeys[0].id;
 const planBy = Object.fromEntries(plans.map((p) => [p.name, p]));
 
 const ALL = "00000000-0000-0000-0000-000000000000";
@@ -70,7 +68,6 @@ for (let i = 0; i < N; i++) {
 
   orders.push({
     patient_id: pick(patients).id,
-    journey_id: journeyId,
     plan_id: plan.id,
     status,
     total,
