@@ -2,8 +2,9 @@ import "server-only";
 
 /** Tags de cache das respostas da Storefront (ver response.ts e os route handlers). */
 export const STOREFRONT_TAGS = {
-  catalog: "storefront-catalog",
+  items: "storefront-items",
   protocols: "storefront-protocols",
+  collections: "storefront-collections",
   anamnesis: "storefront-anamnesis",
 } as const;
 
@@ -20,6 +21,8 @@ async function purge(tags: string[]): Promise<void> {
   }
 }
 
-export const purgeCatalog = () => purge([STOREFRONT_TAGS.catalog]);
-export const purgeProtocols = () => purge([STOREFRONT_TAGS.protocols]);
+// Mudança em item repercute em protocolos (preço/visibilidade do membro) e
+// em coleções (membro/rollup). Purga em cascata para não servir dado velho.
+export const purgeCatalog = () => purge([STOREFRONT_TAGS.items, STOREFRONT_TAGS.collections, STOREFRONT_TAGS.protocols]);
+export const purgeProtocols = () => purge([STOREFRONT_TAGS.protocols, STOREFRONT_TAGS.collections]);
 export const purgeAnamnesis = () => purge([STOREFRONT_TAGS.anamnesis]);

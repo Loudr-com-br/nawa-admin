@@ -45,7 +45,6 @@ export interface Order {
   /** Número legível exibido na operação (ex: #NAWA-1042). */
   number: string;
   patient: OrderPatient;
-  journey: string;
   plan: string;
   status: OrderStatus;
   paymentStatus: PaymentStatus;

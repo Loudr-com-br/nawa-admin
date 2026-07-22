@@ -244,13 +244,8 @@ export default async function OrderDetailPage({
               </DefRow>
             </SectionCard>
 
-            {/* Jornada e plano */}
-            <SectionCard title="Jornada e plano" icon={RouteRoundedIcon}>
-              <DefRow label="Jornada">
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  {order.journey}
-                </Typography>
-              </DefRow>
+            {/* Plano */}
+            <SectionCard title="Plano" icon={RouteRoundedIcon}>
               <DefRow label="Plano">
                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
                   {order.plan}

@@ -11,7 +11,6 @@ import type { Order, OrderItem, OrderEvent } from "./types";
 const ORDER_SELECT = `
   id, status, total, payment_status, prescription_id, botane_order_ref, created_at,
   patient:patients ( id, name, email, phone ),
-  journey:journeys ( name ),
   plan:plans ( name ),
   order_items ( id, ref_type, name, supplier, is_glp1, quantity, unit_price )
 `;
@@ -49,7 +48,6 @@ function mapOrder(r: any): Order {
       email: r.patient?.email ?? "",
       phone: r.patient?.phone ?? "",
     },
-    journey: r.journey?.name ?? "—",
     plan: planName,
     status: r.status,
     paymentStatus: r.payment_status,

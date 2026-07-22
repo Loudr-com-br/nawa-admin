@@ -5,8 +5,7 @@ import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
 import PeopleAltRoundedIcon from "@mui/icons-material/PeopleAltRounded";
 import Inventory2RoundedIcon from "@mui/icons-material/Inventory2Rounded";
 import ScienceRoundedIcon from "@mui/icons-material/ScienceRounded";
-import RouteRoundedIcon from "@mui/icons-material/RouteRounded";
-import SellRoundedIcon from "@mui/icons-material/SellRounded";
+import CategoryRoundedIcon from "@mui/icons-material/CategoryRounded";
 import AssignmentRoundedIcon from "@mui/icons-material/AssignmentRounded";
 import LocalOfferRoundedIcon from "@mui/icons-material/LocalOfferRounded";
 import SyncRoundedIcon from "@mui/icons-material/SyncRounded";
@@ -40,13 +39,12 @@ export const navGroups: NavGroup[] = [
     ],
   },
   {
-    title: "Catálogo & clínica",
+    title: "Catálogo",
     items: [
       { href: "/catalog", label: "Catálogo", icon: Inventory2RoundedIcon },
       { href: "/protocols", label: "Protocolos", icon: ScienceRoundedIcon },
-      { href: "/journeys", label: "Jornadas", icon: RouteRoundedIcon },
+      { href: "/collections", label: "Coleções", icon: CategoryRoundedIcon },
       { href: "/anamnesis", label: "Anamnese", icon: AssignmentRoundedIcon },
-      { href: "/attributes", label: "Nomenclatura", icon: SellRoundedIcon },
       { href: "/promotions", label: "Promoções", icon: LocalOfferRoundedIcon },
     ],
   },

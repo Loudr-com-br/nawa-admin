@@ -40,8 +40,9 @@ function StatusDot({ status }: { status: ApiKey["status"] }) {
 }
 
 const ENDPOINTS = [
-  { path: "/api/storefront/catalog", desc: "Jornadas, planos e produtos publicados" },
-  { path: "/api/storefront/protocols", desc: "Protocolos e fórmulas publicados" },
+  { path: "/api/storefront/items", desc: "Itens/SKUs publicados e públicos" },
+  { path: "/api/storefront/protocols", desc: "Protocolos/kits publicados e públicos" },
+  { path: "/api/storefront/collections", desc: "Coleções publicadas e públicas (com rollup)" },
   { path: "/api/storefront/anamnesis", desc: "Formulários de anamnese publicados" },
 ];
 
