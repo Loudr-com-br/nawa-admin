@@ -23,6 +23,8 @@ import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
 import FactoryRoundedIcon from "@mui/icons-material/FactoryRounded";
 import ScienceRoundedIcon from "@mui/icons-material/ScienceRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import CollectionsRoundedIcon from "@mui/icons-material/CollectionsRounded";
+import Image from "next/image";
 import { SectionCard, DefRow } from "@/components/orders/DetailPrimitives";
 import PublishStatusChip from "@/components/PublishStatusChip";
 import Glp1Tag from "@/components/orders/Glp1Tag";
@@ -196,6 +198,25 @@ export default function ItemDetailClient({ item }: { item: Item }) {
       <Grid container spacing={2.5}>
         <Grid size={{ xs: 12, lg: 8 }}>
           <Stack spacing={2.5}>
+            <SectionCard title="Imagens" icon={CollectionsRoundedIcon}>
+              {item.imageUrls.length === 0 ? (
+                <Typography variant="body2" color="text.disabled">
+                  Nenhuma imagem. Use “Editar” para enviar (a primeira é a capa).
+                </Typography>
+              ) : (
+                <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1.5 }}>
+                  {item.imageUrls.map((url, idx) => (
+                    <Box key={url} sx={{ position: "relative", width: 96, height: 96, borderRadius: 2, overflow: "hidden", border: idx === 0 ? "2px solid #204FF1" : "1px solid #E0E0E0" }}>
+                      <Image src={url} alt={`${item.name} ${idx + 1}`} fill sizes="96px" style={{ objectFit: "cover" }} />
+                      {idx === 0 && (
+                        <Box sx={{ position: "absolute", top: 4, left: 4, px: 0.75, borderRadius: 1, bgcolor: "primary.main", color: "#fff", fontSize: 10, lineHeight: 1.8, zIndex: 1 }}>capa</Box>
+                      )}
+                    </Box>
+                  ))}
+                </Stack>
+              )}
+            </SectionCard>
+
             <SectionCard title="Descrição" icon={ScienceRoundedIcon}>
               <Typography variant="body2" color={item.description ? "text.primary" : "text.disabled"}>
                 {item.description || "Sem descrição."}
@@ -337,11 +358,11 @@ export default function ItemDetailClient({ item }: { item: Item }) {
                 <Stack direction="row" spacing={1.5} sx={{ flexWrap: "wrap", gap: 1.5 }}>
                   {form.imageUrls.map((url, idx) => (
                     <Box key={url} sx={{ position: "relative" }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt={`Imagem ${idx + 1}`} width={72} height={72}
-                        style={{ objectFit: "cover", borderRadius: 8, border: idx === 0 ? "2px solid #204FF1" : "1px solid #E0E0E0", display: "block" }} />
+                      <Box sx={{ position: "relative", width: 72, height: 72, borderRadius: 2, overflow: "hidden", border: idx === 0 ? "2px solid #204FF1" : "1px solid #E0E0E0" }}>
+                        <Image src={url} alt={`Imagem ${idx + 1}`} fill sizes="72px" style={{ objectFit: "cover" }} />
+                      </Box>
                       {idx === 0 && (
-                        <Box sx={{ position: "absolute", top: 2, left: 2, px: 0.5, borderRadius: 1, bgcolor: "primary.main", color: "#fff", fontSize: 9, lineHeight: 1.6 }}>capa</Box>
+                        <Box sx={{ position: "absolute", top: 2, left: 2, px: 0.5, borderRadius: 1, bgcolor: "primary.main", color: "#fff", fontSize: 9, lineHeight: 1.6, zIndex: 1 }}>capa</Box>
                       )}
                       <Stack direction="row" spacing={0.5} sx={{ mt: 0.5, justifyContent: "center" }}>
                         {idx !== 0 && (

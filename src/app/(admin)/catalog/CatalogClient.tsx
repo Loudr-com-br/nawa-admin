@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Box from "@mui/material/Box";
+import Image from "next/image";
 import Card from "@mui/material/Card";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -51,6 +52,14 @@ function fmtMargin(price: number, cost: number | null) {
 }
 
 const columns: Column<Item>[] = [
+  {
+    id: "cover", label: "",
+    render: (i) => i.imageUrls[0]
+      ? <Box sx={{ position: "relative", width: 40, height: 40, borderRadius: 1.5, overflow: "hidden", border: "1px solid", borderColor: "divider" }}>
+          <Image src={i.imageUrls[0]} alt="" fill sizes="40px" style={{ objectFit: "cover" }} />
+        </Box>
+      : <Box sx={{ width: 40, height: 40, borderRadius: 1.5, bgcolor: "grey.100", border: "1px solid", borderColor: "divider" }} />,
+  },
   {
     id: "name", label: "Item", sortable: true, sortAccessor: (i) => i.name,
     render: (i) => (
