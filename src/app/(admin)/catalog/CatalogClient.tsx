@@ -148,7 +148,7 @@ export default function CatalogClient({
       cost: form.cost === "" ? null : Number(form.cost),
       externalRef: form.externalRef || null,
       compositionRaw: form.compositionRaw || null,
-      imageUrl: null, // imagem é definida na página de detalhe do item
+      imageUrls: [], // imagens são definidas na página de detalhe do item
       status: form.published ? "published" : "draft",
     });
     setSaving(false);

@@ -13,24 +13,28 @@ export async function getPublishedItems() {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("items")
-    .select("slug, name, item_type, pharmaceutical_form, description, composition, price, is_glp1, image_url")
+    .select("slug, name, item_type, pharmaceutical_form, description, composition, price, is_glp1, image_url, image_urls")
     .eq("status", "published")
     .eq("visibility", "public")
     .eq("sells_standalone", true)
     .order("name");
 
   return {
-    items: (data ?? []).map((i: any) => ({
-      slug: i.slug,
-      name: i.name,
-      itemType: i.item_type,
-      form: i.pharmaceutical_form,
-      description: i.description ?? "",
-      composition: i.composition ?? {},
-      price: Number(i.price),
-      isGlp1: i.is_glp1,
-      imageUrl: i.image_url ?? "",
-    })),
+    items: (data ?? []).map((i: any) => {
+      const gallery: string[] = Array.isArray(i.image_urls) ? i.image_urls.filter(Boolean) : [];
+      return {
+        slug: i.slug,
+        name: i.name,
+        itemType: i.item_type,
+        form: i.pharmaceutical_form,
+        description: i.description ?? "",
+        composition: i.composition ?? {},
+        price: Number(i.price),
+        isGlp1: i.is_glp1,
+        imageUrl: gallery[0] ?? i.image_url ?? "", // capa
+        imageUrls: gallery,
+      };
+    }),
   };
 }
 

@@ -32,7 +32,7 @@ export interface ItemInput {
   sellsStandalone: boolean;
   isGlp1: boolean;
   price: number;
-  imageUrl: string | null;
+  imageUrls: string[];
   // Propriedade do fornecedor — só aplicados se o fornecedor for interno (§9).
   pharmaceuticalForm: PharmaceuticalForm;
   description: string | null;
@@ -54,7 +54,8 @@ function nawaFields(input: ItemInput) {
     sells_standalone: input.sellsStandalone,
     is_glp1: input.isGlp1,
     price: input.price,
-    image_url: input.imageUrl?.trim() || null,
+    image_urls: input.imageUrls,
+    image_url: input.imageUrls[0] ?? null, // capa espelha a 1ª da galeria
     status: input.status,
   };
 }

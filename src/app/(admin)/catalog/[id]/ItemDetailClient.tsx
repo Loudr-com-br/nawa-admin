@@ -71,7 +71,7 @@ export default function ItemDetailClient({ item }: { item: Item }) {
     visibility: item.visibility, sellsStandalone: item.sellsStandalone,
     isGlp1: item.isGlp1, description: item.description ?? "",
     compositionRaw: compositionRaw(item.composition) ?? "", externalRef: item.externalRef ?? "",
-    imageUrl: item.imageUrl ?? "",
+    imageUrls: item.imageUrls ?? [],
   });
   const medLocked = forcesMedicalOnly(form.itemType);
 
@@ -98,7 +98,7 @@ export default function ItemDetailClient({ item }: { item: Item }) {
       visibility: item.visibility, sellsStandalone: item.sellsStandalone,
       isGlp1: item.isGlp1, description: item.description ?? "",
       compositionRaw: compositionRaw(item.composition) ?? "", externalRef: item.externalRef ?? "",
-      imageUrl: item.imageUrl ?? "",
+      imageUrls: item.imageUrls ?? [],
     });
     setOpen(true);
   }
@@ -118,7 +118,7 @@ export default function ItemDetailClient({ item }: { item: Item }) {
       cost: form.cost === "" ? null : Number(form.cost),
       externalRef: form.externalRef || null,
       compositionRaw: form.compositionRaw || null,
-      imageUrl: form.imageUrl || null,
+      imageUrls: form.imageUrls,
       status: item.status,
     });
     setBusy(false);
@@ -129,18 +129,32 @@ export default function ItemDetailClient({ item }: { item: Item }) {
   }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // permite re-selecionar o mesmo arquivo
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = ""; // permite re-selecionar os mesmos arquivos
+    if (!files.length) return;
     setError(null);
     setUploading(true);
-    const data = new FormData();
-    data.set("file", file);
-    const result = await uploadCatalogImage("items", data);
+    const urls: string[] = [];
+    for (const file of files) {
+      const data = new FormData();
+      data.set("file", file);
+      const result = await uploadCatalogImage("items", data);
+      if (!result.ok) { setError(result.error); break; }
+      urls.push(result.url);
+    }
     setUploading(false);
-    if (!result.ok) { setError(result.error); return; }
-    setForm((f) => ({ ...f, imageUrl: result.url }));
-    toast.success("Imagem enviada — salve para aplicar");
+    if (urls.length) {
+      setForm((f) => ({ ...f, imageUrls: [...f.imageUrls, ...urls] }));
+      toast.success(`${urls.length} imagem(ns) enviada(s) — salve para aplicar`);
+    }
+  }
+
+  function removeImage(url: string) {
+    setForm((f) => ({ ...f, imageUrls: f.imageUrls.filter((u) => u !== url) }));
+  }
+
+  function makeCover(url: string) {
+    setForm((f) => ({ ...f, imageUrls: [url, ...f.imageUrls.filter((u) => u !== url)] }));
   }
 
   async function handleDelete() {
@@ -306,25 +320,40 @@ export default function ItemDetailClient({ item }: { item: Item }) {
               multiline rows={2} disabled={supplierReadOnly} helperText={supplierReadOnly ? "Do fornecedor — somente leitura." : undefined} />
             <TextField label="Composição" value={form.compositionRaw} onChange={(e) => setForm({ ...form, compositionRaw: e.target.value })}
               multiline rows={2} disabled={supplierReadOnly} helperText={supplierReadOnly ? "Do fornecedor — somente leitura." : undefined} />
-            {/* Imagem do produto (NAWA) — upload p/ o bucket público ou URL. */}
-            <Stack direction="row" spacing={2} alignItems="center">
-              {form.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={form.imageUrl} alt="Prévia" width={56} height={56}
-                  style={{ objectFit: "cover", borderRadius: 8, border: "1px solid #E0E0E0" }} />
+            {/* Galeria de imagens (NAWA) — upload p/ o bucket. A 1ª é a capa. */}
+            <Box>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>Imagens do produto</Typography>
+                <Button component="label" variant="outlined" size="small" disabled={uploading}>
+                  {uploading ? "Enviando…" : "Enviar imagens"}
+                  <input type="file" hidden accept="image/*" multiple onChange={handleImageUpload} />
+                </Button>
+              </Stack>
+              {form.imageUrls.length === 0 ? (
+                <Typography variant="caption" color="text.secondary">
+                  Nenhuma imagem ainda. Envie uma ou mais (a primeira é a capa).
+                </Typography>
               ) : (
-                <Box sx={{ width: 56, height: 56, borderRadius: 2, bgcolor: "grey.100", border: "1px solid", borderColor: "divider" }} />
+                <Stack direction="row" spacing={1.5} sx={{ flexWrap: "wrap", gap: 1.5 }}>
+                  {form.imageUrls.map((url, idx) => (
+                    <Box key={url} sx={{ position: "relative" }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`Imagem ${idx + 1}`} width={72} height={72}
+                        style={{ objectFit: "cover", borderRadius: 8, border: idx === 0 ? "2px solid #204FF1" : "1px solid #E0E0E0", display: "block" }} />
+                      {idx === 0 && (
+                        <Box sx={{ position: "absolute", top: 2, left: 2, px: 0.5, borderRadius: 1, bgcolor: "primary.main", color: "#fff", fontSize: 9, lineHeight: 1.6 }}>capa</Box>
+                      )}
+                      <Stack direction="row" spacing={0.5} sx={{ mt: 0.5, justifyContent: "center" }}>
+                        {idx !== 0 && (
+                          <Button size="small" sx={{ minWidth: 0, px: 0.5, fontSize: 10 }} onClick={() => makeCover(url)}>capa</Button>
+                        )}
+                        <Button size="small" color="inherit" sx={{ minWidth: 0, px: 0.5, fontSize: 10 }} onClick={() => removeImage(url)}>remover</Button>
+                      </Stack>
+                    </Box>
+                  ))}
+                </Stack>
               )}
-              <Button component="label" variant="outlined" size="small" disabled={uploading}>
-                {uploading ? "Enviando…" : "Enviar imagem"}
-                <input type="file" hidden accept="image/*" onChange={handleImageUpload} />
-              </Button>
-              {form.imageUrl && (
-                <Button size="small" color="inherit" onClick={() => setForm({ ...form, imageUrl: "" })}>Remover</Button>
-              )}
-            </Stack>
-            <TextField label="URL da imagem" value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-              helperText="Preenchido pelo upload, ou cole uma URL. Vai ao storefront." />
+            </Box>
             <Stack direction="row" spacing={3}>
               <FormControlLabel control={<Switch checked={form.sellsStandalone} onChange={(e) => setForm({ ...form, sellsStandalone: e.target.checked })} />} label={<Typography variant="body2">Vende avulso</Typography>} />
               <FormControlLabel control={<Switch checked={form.isGlp1} onChange={(e) => setForm({ ...form, isGlp1: e.target.checked })} />} label={<Typography variant="body2">GLP-1</Typography>} />

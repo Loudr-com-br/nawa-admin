@@ -7,7 +7,7 @@ import type { Item, ItemCaution, SupplierOption } from "./types";
 const ITEM_SELECT =
   "id, slug, name, supplier_id, external_ref, item_type, pharmaceutical_form, " +
   "description, composition, cautions, cost, price, is_glp1, sells_standalone, " +
-  "image_url, visibility, status, synced_at, created_at, updated_at, " +
+  "image_url, image_urls, visibility, status, synced_at, created_at, updated_at, " +
   "supplier:suppliers(name, type, slug)";
 
 function toItem(r: any): Item {
@@ -29,7 +29,7 @@ function toItem(r: any): Item {
     price: Number(r.price),
     isGlp1: r.is_glp1,
     sellsStandalone: r.sells_standalone,
-    imageUrl: r.image_url ?? null,
+    imageUrls: Array.isArray(r.image_urls) ? r.image_urls : [],
     visibility: r.visibility,
     status: r.status,
     syncedAt: r.synced_at,

@@ -296,6 +296,7 @@ export type Database = {
           external_ref: string | null
           id: string
           image_url: string | null
+          image_urls: string[]
           is_glp1: boolean
           item_type: Database["public"]["Enums"]["item_type"]
           name: string
@@ -318,6 +319,7 @@ export type Database = {
           external_ref?: string | null
           id?: string
           image_url?: string | null
+          image_urls?: string[]
           is_glp1?: boolean
           item_type?: Database["public"]["Enums"]["item_type"]
           name: string
@@ -340,6 +342,7 @@ export type Database = {
           external_ref?: string | null
           id?: string
           image_url?: string | null
+          image_urls?: string[]
           is_glp1?: boolean
           item_type?: Database["public"]["Enums"]["item_type"]
           name?: string
