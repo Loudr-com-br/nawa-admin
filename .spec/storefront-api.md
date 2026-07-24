@@ -72,13 +72,16 @@ Itens/SKUs publicados, públicos e que vendem avulso (`sells_standalone = true`)
       "description": "",
       "composition": {},
       "price": 90,
-      "isGlp1": false
+      "isGlp1": false,
+      "imageUrl": ""
     }
   ]
 }
 ```
 
-Nunca trafega: `cost`, `external_ref`, `claim_internal`, `supplier_id` (spec §6.1).
+`imageUrl` é a URL pública da imagem do produto (string vazia quando não há
+imagem). Nunca trafega: `cost`, `external_ref`, `claim_internal`, `supplier_id`
+(spec §6.1).
 
 ### `GET /api/storefront/protocols`
 Protocolos/kits publicados e públicos, com seus itens.
@@ -93,6 +96,7 @@ Protocolos/kits publicados e públicos, com seus itens.
       "pageContent": "",
       "claimPublic": "",
       "price": 690,
+      "imageUrl": "",
       "items": [
         { "name": "Vitamina D3 2000UI", "form": "capsule", "composition": {}, "quantity": 1 }
       ]
@@ -117,12 +121,13 @@ Coleções publicadas e públicas, com membros próprios e o **rollup** dos filh
       "slug": "metabolic-reset",
       "name": "Metabolic Reset",
       "description": "",
+      "imageUrl": "",
       "parentSlug": null,
       "members": [
-        { "refType": "protocol", "slug": "reset-avancado", "name": "Reset Metabólico Avançado" }
+        { "refType": "protocol", "slug": "reset-avancado", "name": "Reset Metabólico Avançado", "imageUrl": "" }
       ],
       "rollupMembers": [
-        { "refType": "item", "slug": "vitamina-d3-2000ui", "name": "Vitamina D3 2000UI" }
+        { "refType": "item", "slug": "vitamina-d3-2000ui", "name": "Vitamina D3 2000UI", "imageUrl": "" }
       ]
     }
   ]

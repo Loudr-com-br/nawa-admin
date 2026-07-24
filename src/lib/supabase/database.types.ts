@@ -241,6 +241,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          image_url: string | null
           name: string
           order: number
           parent_id: string | null
@@ -253,6 +254,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          image_url?: string | null
           name: string
           order?: number
           parent_id?: string | null
@@ -265,6 +267,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          image_url?: string | null
           name?: string
           order?: number
           parent_id?: string | null
@@ -292,6 +295,7 @@ export type Database = {
           description: string | null
           external_ref: string | null
           id: string
+          image_url: string | null
           is_glp1: boolean
           item_type: Database["public"]["Enums"]["item_type"]
           name: string
@@ -313,6 +317,7 @@ export type Database = {
           description?: string | null
           external_ref?: string | null
           id?: string
+          image_url?: string | null
           is_glp1?: boolean
           item_type?: Database["public"]["Enums"]["item_type"]
           name: string
@@ -334,6 +339,7 @@ export type Database = {
           description?: string | null
           external_ref?: string | null
           id?: string
+          image_url?: string | null
           is_glp1?: boolean
           item_type?: Database["public"]["Enums"]["item_type"]
           name?: string
@@ -743,6 +749,7 @@ export type Database = {
           clinical_description: string | null
           created_at: string
           id: string
+          image_url: string | null
           name: string
           page_content: Json
           price: number
@@ -762,6 +769,7 @@ export type Database = {
           clinical_description?: string | null
           created_at?: string
           id?: string
+          image_url?: string | null
           name: string
           page_content?: Json
           price?: number
@@ -781,6 +789,7 @@ export type Database = {
           clinical_description?: string | null
           created_at?: string
           id?: string
+          image_url?: string | null
           name?: string
           page_content?: Json
           price?: number

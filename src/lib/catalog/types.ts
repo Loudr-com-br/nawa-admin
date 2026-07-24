@@ -44,6 +44,7 @@ export interface Item {
   price: number;
   isGlp1: boolean;
   sellsStandalone: boolean;
+  imageUrl: string | null;
   visibility: Visibility;
   status: ContentStatus;
   // Metadados

@@ -25,3 +25,4 @@ supabase/.branches
 # Misc
 .DS_Store
 *.pem
+*.tsbuildinfo

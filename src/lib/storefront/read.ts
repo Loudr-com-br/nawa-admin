@@ -13,7 +13,7 @@ export async function getPublishedItems() {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("items")
-    .select("slug, name, item_type, pharmaceutical_form, description, composition, price, is_glp1")
+    .select("slug, name, item_type, pharmaceutical_form, description, composition, price, is_glp1, image_url")
     .eq("status", "published")
     .eq("visibility", "public")
     .eq("sells_standalone", true)
@@ -29,6 +29,7 @@ export async function getPublishedItems() {
       composition: i.composition ?? {},
       price: Number(i.price),
       isGlp1: i.is_glp1,
+      imageUrl: i.image_url ?? "",
     })),
   };
 }
@@ -39,7 +40,7 @@ export async function getPublishedProtocols() {
   const { data } = await supabase
     .from("protocols")
     .select(
-      "slug, name, clinical_description, page_content, claim_public, claim_status, price, " +
+      "slug, name, clinical_description, page_content, claim_public, claim_status, price, image_url, " +
         "protocol_items(quantity, item:items(name, pharmaceutical_form, composition, visibility))"
     )
     .eq("status", "published")
@@ -55,6 +56,7 @@ export async function getPublishedProtocols() {
       pageContent: typeof p.page_content?.body === "string" ? p.page_content.body : "",
       claimPublic: p.claim_status === "approved" ? p.claim_public ?? "" : "",
       price: Number(p.price),
+      imageUrl: p.image_url ?? "",
       items: (p.protocol_items ?? []).map((pi: any) => ({
         name: pi.item?.name ?? "",
         form: pi.item?.pharmaceutical_form ?? "",
@@ -72,7 +74,7 @@ export async function getPublishedCollections() {
 
   const { data: cols } = await supabase
     .from("collections")
-    .select("id, slug, name, description, parent_id")
+    .select("id, slug, name, description, parent_id, image_url")
     .eq("status", "published")
     .eq("visibility", "public")
     .order("order");
@@ -90,15 +92,15 @@ export async function getPublishedCollections() {
   const itemIds = memberRows.filter((m: any) => m.ref_type === "item").map((m: any) => m.ref_id);
   const protoIds = memberRows.filter((m: any) => m.ref_type === "protocol").map((m: any) => m.ref_id);
   const [items, protos] = await Promise.all([
-    itemIds.length ? supabase.from("items").select("id, slug, name, status, visibility").in("id", itemIds) : Promise.resolve({ data: [] }),
-    protoIds.length ? supabase.from("protocols").select("id, slug, name, status, visibility").in("id", protoIds) : Promise.resolve({ data: [] }),
+    itemIds.length ? supabase.from("items").select("id, slug, name, status, visibility, image_url").in("id", itemIds) : Promise.resolve({ data: [] }),
+    protoIds.length ? supabase.from("protocols").select("id, slug, name, status, visibility, image_url").in("id", protoIds) : Promise.resolve({ data: [] }),
   ]);
-  const pub = new Map<string, { slug: string; name: string; refType: string }>();
+  const pub = new Map<string, { slug: string; name: string; refType: string; imageUrl: string }>();
   for (const i of (items as any).data ?? []) {
-    if (i.status === "published" && i.visibility === "public") pub.set(`item:${i.id}`, { slug: i.slug, name: i.name, refType: "item" });
+    if (i.status === "published" && i.visibility === "public") pub.set(`item:${i.id}`, { slug: i.slug, name: i.name, refType: "item", imageUrl: i.image_url ?? "" });
   }
   for (const p of (protos as any).data ?? []) {
-    if (p.status === "published" && p.visibility === "public") pub.set(`protocol:${p.id}`, { slug: p.slug, name: p.name, refType: "protocol" });
+    if (p.status === "published" && p.visibility === "public") pub.set(`protocol:${p.id}`, { slug: p.slug, name: p.name, refType: "protocol", imageUrl: p.image_url ?? "" });
   }
 
   // Membros filtrados por coleção.
@@ -133,9 +135,10 @@ export async function getPublishedCollections() {
       slug: c.slug,
       name: c.name,
       description: c.description ?? "",
+      imageUrl: c.image_url ?? "",
       parentSlug: c.parent_id && slugById.has(c.parent_id) ? slugById.get(c.parent_id) : null,
-      members: own.map((m) => ({ refType: m.refType, slug: m.slug, name: m.name })),
-      rollupMembers: rollup.map((m) => ({ refType: m.refType, slug: m.slug, name: m.name })),
+      members: own.map((m) => ({ refType: m.refType, slug: m.slug, name: m.name, imageUrl: m.imageUrl })),
+      rollupMembers: rollup.map((m) => ({ refType: m.refType, slug: m.slug, name: m.name, imageUrl: m.imageUrl })),
     };
   });
 
