@@ -8,34 +8,87 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // Nunca servir: cost, external_ref, claim_internal, supplier_id.
 // Usa o admin client (service role, ignora RLS) → o filtro é manual e explícito.
 
-/** Itens/SKUs publicados, públicos e que vendem avulso. */
-export async function getPublishedItems() {
+/**
+ * Itens/SKUs publicados, públicos e que vendem avulso.
+ * Aditivo (api-boundary §3.3): aceita busca (`q`) e paginação (`page`/`limit`).
+ * Sem opções → lista completa (comportamento atual, retrocompatível).
+ */
+export async function getPublishedItems(
+  opts: { q?: string; page?: number; limit?: number } = {}
+) {
   const supabase = createAdminClient();
-  const { data } = await supabase
+  const paginated = typeof opts.limit === "number" && opts.limit > 0;
+
+  let query = supabase
     .from("items")
-    .select("slug, name, item_type, pharmaceutical_form, description, composition, price, is_glp1, image_url, image_urls")
+    .select(
+      "slug, name, item_type, pharmaceutical_form, description, composition, price, is_glp1, image_url, image_urls",
+      paginated ? { count: "exact" } : undefined
+    )
     .eq("status", "published")
     .eq("visibility", "public")
-    .eq("sells_standalone", true)
-    .order("name");
+    .eq("sells_standalone", true);
 
-  return {
-    items: (data ?? []).map((i: any) => {
-      const gallery: string[] = Array.isArray(i.image_urls) ? i.image_urls.filter(Boolean) : [];
-      return {
-        slug: i.slug,
-        name: i.name,
-        itemType: i.item_type,
-        form: i.pharmaceutical_form,
-        description: i.description ?? "",
-        composition: i.composition ?? {},
-        price: Number(i.price),
-        isGlp1: i.is_glp1,
-        imageUrl: gallery[0] ?? i.image_url ?? "", // capa
-        imageUrls: gallery,
-      };
-    }),
-  };
+  if (opts.q?.trim()) query = query.ilike("name", `%${opts.q.trim()}%`);
+  query = query.order("name");
+
+  let page = 1;
+  if (paginated) {
+    page = Math.max(1, opts.page ?? 1);
+    const from = (page - 1) * opts.limit!;
+    query = query.range(from, from + opts.limit! - 1);
+  }
+
+  const { data, count } = await query;
+  const items = (data ?? []).map((i: any) => {
+    const gallery: string[] = Array.isArray(i.image_urls) ? i.image_urls.filter(Boolean) : [];
+    return {
+      slug: i.slug,
+      name: i.name,
+      itemType: i.item_type,
+      form: i.pharmaceutical_form,
+      description: i.description ?? "",
+      composition: i.composition ?? {},
+      price: Number(i.price),
+      isGlp1: i.is_glp1,
+      imageUrl: gallery[0] ?? i.image_url ?? "", // capa
+      imageUrls: gallery,
+    };
+  });
+
+  const result: any = { items };
+  if (paginated) {
+    result.total = count ?? items.length;
+    result.page = page;
+    result.pageSize = opts.limit;
+  }
+  return result;
+}
+
+/**
+ * Busca unificada do catálogo (itens + protocolos) por nome. Read/cacheável.
+ * Preserva o fail-closed: protocolo com item medical_only não aparece (§6.1).
+ */
+export async function searchCatalog(q: string, limit = 20) {
+  const term = q?.trim();
+  if (!term) return { results: [] };
+  const supabase = createAdminClient();
+
+  // RPC acento-insensível com fail-closed no SQL (ver migration search_unaccent).
+  const { data } = await supabase.rpc("storefront_search", { q: term, lim: limit });
+
+  const results = ((data ?? []) as any[])
+    .map((r) => ({
+      refType: r.ref_type as "item" | "protocol",
+      slug: r.slug as string,
+      name: r.name as string,
+      price: Number(r.price),
+      imageUrl: (r.image_url as string) ?? "",
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .slice(0, limit);
+
+  return { results };
 }
 
 /** Protocolos/kits publicados e públicos, com itens. Claim público só se aprovado. */
@@ -154,7 +207,7 @@ export async function getPublishedAnamnesis() {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("anamnesis_forms")
-    .select("slug, name, anamnesis_questions(order, type, label, required, options, conditional_logic)")
+    .select("slug, name, anamnesis_questions(id, order, type, label, required, options, conditional_logic)")
     .eq("status", "published");
 
   return {
@@ -164,6 +217,7 @@ export async function getPublishedAnamnesis() {
       questions: (f.anamnesis_questions ?? [])
         .sort((a: any, b: any) => a.order - b.order)
         .map((q: any) => ({
+          id: q.id, // estável — o front devolve as respostas por questionId no evaluate
           order: q.order,
           type: q.type,
           label: q.label,

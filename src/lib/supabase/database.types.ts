@@ -201,6 +201,104 @@ export type Database = {
         }
         Relationships: []
       }
+      cart_lines: {
+        Row: {
+          cart_id: string
+          created_at: string
+          id: string
+          is_upsell: boolean
+          quantity: number
+          ref_id: string
+          ref_type: Database["public"]["Enums"]["catalog_ref_type"]
+          unit_price: number
+        }
+        Insert: {
+          cart_id: string
+          created_at?: string
+          id?: string
+          is_upsell?: boolean
+          quantity?: number
+          ref_id: string
+          ref_type: Database["public"]["Enums"]["catalog_ref_type"]
+          unit_price?: number
+        }
+        Update: {
+          cart_id?: string
+          created_at?: string
+          id?: string
+          is_upsell?: boolean
+          quantity?: number
+          ref_id?: string
+          ref_type?: Database["public"]["Enums"]["catalog_ref_type"]
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cart_lines_cart_id_fkey"
+            columns: ["cart_id"]
+            isOneToOne: false
+            referencedRelation: "carts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      carts: {
+        Row: {
+          anamnesis_answers: Json
+          anamnesis_form_id: string | null
+          created_at: string
+          email: string | null
+          hash: string
+          id: string
+          patient_id: string | null
+          score: number | null
+          session_token: string | null
+          status: Database["public"]["Enums"]["cart_status"]
+          updated_at: string
+        }
+        Insert: {
+          anamnesis_answers?: Json
+          anamnesis_form_id?: string | null
+          created_at?: string
+          email?: string | null
+          hash: string
+          id?: string
+          patient_id?: string | null
+          score?: number | null
+          session_token?: string | null
+          status?: Database["public"]["Enums"]["cart_status"]
+          updated_at?: string
+        }
+        Update: {
+          anamnesis_answers?: Json
+          anamnesis_form_id?: string | null
+          created_at?: string
+          email?: string | null
+          hash?: string
+          id?: string
+          patient_id?: string | null
+          score?: number | null
+          session_token?: string | null
+          status?: Database["public"]["Enums"]["cart_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carts_anamnesis_form_id_fkey"
+            columns: ["anamnesis_form_id"]
+            isOneToOne: false
+            referencedRelation: "anamnesis_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "carts_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collection_members: {
         Row: {
           collection_id: string
@@ -975,12 +1073,27 @@ export type Database = {
         Args: { roles: Database["public"]["Enums"]["app_role"][] }
         Returns: boolean
       }
+      immutable_unaccent: { Args: { "": string }; Returns: string }
       is_super_admin: { Args: never; Returns: boolean }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      storefront_search: {
+        Args: { lim?: number; q: string }
+        Returns: {
+          image_url: string
+          name: string
+          price: number
+          ref_type: string
+          slug: string
+        }[]
+      }
+      unaccent: { Args: { "": string }; Returns: string }
     }
     Enums: {
       api_key_status: "active" | "revoked"
       app_role: "super_admin" | "catalog_admin" | "doctor" | "operator"
       attribute_scope: "catalog" | "protocol" | "journey"
+      cart_status: "active" | "converted" | "abandoned"
       catalog_ref_type: "item" | "protocol"
       claim_status: "draft" | "pending_review" | "approved" | "rejected"
       collection_visibility: "public" | "internal"
@@ -1139,6 +1252,7 @@ export const Constants = {
       api_key_status: ["active", "revoked"],
       app_role: ["super_admin", "catalog_admin", "doctor", "operator"],
       attribute_scope: ["catalog", "protocol", "journey"],
+      cart_status: ["active", "converted", "abandoned"],
       catalog_ref_type: ["item", "protocol"],
       claim_status: ["draft", "pending_review", "approved", "rejected"],
       collection_visibility: ["public", "internal"],

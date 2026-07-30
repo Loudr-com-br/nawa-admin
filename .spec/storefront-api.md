@@ -2,7 +2,8 @@
 
 > Contrato de leitura que o **front** (headless) consome para renderizar o
 > catálogo publicado pela NAWA. Referência para o desenvolvimento do storefront.
-> **Última atualização:** 2026-07-24 (atualizado para o Catálogo v2).
+> **Última atualização:** 2026-07-28 (reconciliado com o código v2 real —
+> rotas `/items`,`/protocols`,`/collections`,`/anamnesis`; galeria `imageUrls` em items).
 >
 > Base técnica das regras: [`catalogo-protocolos-v2.md`](catalogo-protocolos-v2.md).
 > Endurecimento da fronteira antes do lançamento: `frontoffice/.spec/api-boundary.md`.
@@ -73,15 +74,17 @@ Itens/SKUs publicados, públicos e que vendem avulso (`sells_standalone = true`)
       "composition": {},
       "price": 90,
       "isGlp1": false,
-      "imageUrl": ""
+      "imageUrl": "",
+      "imageUrls": []
     }
   ]
 }
 ```
 
-`imageUrl` é a URL pública da imagem do produto (string vazia quando não há
-imagem). Nunca trafega: `cost`, `external_ref`, `claim_internal`, `supplier_id`
-(spec §6.1).
+`imageUrl` é a capa (a 1ª da galeria, ou `image_url` como fallback; string vazia
+quando não há imagem). `imageUrls` é a galeria completa (array de URLs públicas,
+`[]` quando vazia). Nunca trafega: `cost`, `external_ref`, `claim_internal`,
+`supplier_id` (spec §6.1).
 
 ### `GET /api/storefront/protocols`
 Protocolos/kits publicados e públicos, com seus itens.
@@ -255,9 +258,12 @@ Vary: Authorization, x-api-key
 > Endurecimento consolidado em `frontoffice/.spec/api-boundary.md` — trabalho de
 > uma **semana dedicada antes do lançamento**.
 
-- **Versionamento**: `/api/storefront/v1/*` para evoluir sem quebrar o front.
-- **Indexação e busca**: paginação, filtros e índice de busca do catálogo (hoje
-  as rotas devolvem listas completas).
+- **Versionamento**: ✅ (2026-07-30) `/api/storefront/v1/*` é o canônico; as rotas
+  sem versão são alias retrocompatível (re-export). Falta versionar checkout/patient.
+- **Indexação e busca**: ✅ (2026-07-29) `GET /api/storefront/search?q=&limit=`
+  (itens+protocolos, acento-insensível, fail-closed) + paginação aditiva em
+  `/items?q=&page=&limit=` (índice Postgres `pg_trgm`+`unaccent`). Falta: filtros
+  por atributo, sitemap/SEO.
 - **Contrato tipado compartilhado**: formalizar o formato (schema/validação) — o
   front espelha os tipos à mão hoje.
 - **Rate limiting por chave** e métricas de uso (hit-rate, latência).

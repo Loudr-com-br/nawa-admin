@@ -2,8 +2,11 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from "./config";
 
-/** Rotas públicas que dispensam sessão. A Storefront autentica por chave própria. */
-const PUBLIC_PATHS = ["/login", "/auth", "/api/storefront"];
+/**
+ * Rotas que dispensam a sessão Supabase. A Storefront e as superfícies de
+ * escrita do front (evaluate/cart) autenticam por chave de API própria.
+ */
+const PUBLIC_PATHS = ["/login", "/auth", "/api/storefront", "/api/anamnesis", "/api/cart", "/api/patient"];
 
 /**
  * Atualiza a sessão nos cookies e protege rotas.

@@ -1,9 +1,4 @@
-import { authenticateStorefront } from "@/lib/storefront/auth";
-import { getPublishedItems } from "@/lib/storefront/read";
-import { storefrontJson, storefrontUnauthorized } from "@/lib/storefront/response";
-import { STOREFRONT_TAGS } from "@/lib/storefront/purge";
-
-export async function GET(request: Request) {
-  if (!(await authenticateStorefront(request))) return storefrontUnauthorized();
-  return storefrontJson(await getPublishedItems(), STOREFRONT_TAGS.items);
-}
+// Alias retrocompatível — a implementação vive em /v1 (versionamento da
+// fronteira, api-boundary §3.4). Rotas sem versão continuam funcionando p/ o
+// que já está em produção; o novo é servido por /api/storefront/v1/*.
+export { GET } from "../v1/items/route";
