@@ -687,6 +687,50 @@ export type Database = {
         }
         Relationships: []
       }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          order_id: string
+          provider: Database["public"]["Enums"]["payment_provider"]
+          provider_ref: string | null
+          raw: Json
+          status: Database["public"]["Enums"]["payment_txn_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          order_id: string
+          provider?: Database["public"]["Enums"]["payment_provider"]
+          provider_ref?: string | null
+          raw?: Json
+          status?: Database["public"]["Enums"]["payment_txn_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          order_id?: string
+          provider?: Database["public"]["Enums"]["payment_provider"]
+          provider_ref?: string | null
+          raw?: Json
+          status?: Database["public"]["Enums"]["payment_txn_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plans: {
         Row: {
           base_price: number
@@ -1108,7 +1152,14 @@ export type Database = {
         | "shipped"
         | "delivered"
         | "failed"
+      payment_provider: "stub" | "pagarme"
       payment_status: "paid" | "pending" | "failed" | "refunded"
+      payment_txn_status:
+        | "created"
+        | "processing"
+        | "paid"
+        | "failed"
+        | "refunded"
       pharmaceutical_form:
         | "capsula"
         | "sache"
@@ -1269,7 +1320,15 @@ export const Constants = {
         "delivered",
         "failed",
       ],
+      payment_provider: ["stub", "pagarme"],
       payment_status: ["paid", "pending", "failed", "refunded"],
+      payment_txn_status: [
+        "created",
+        "processing",
+        "paid",
+        "failed",
+        "refunded",
+      ],
       pharmaceutical_form: [
         "capsula",
         "sache",
