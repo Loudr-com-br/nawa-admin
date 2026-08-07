@@ -17,6 +17,7 @@ export async function getPatientOrders(patientId: string) {
 
   return {
     orders: (data ?? []).map((o: any) => ({
+      id: o.id, // usado pelo /checkout/pay (é o pedido do próprio paciente, escopado)
       number: `#NAWA-${String(o.id).slice(0, 4).toUpperCase()}`,
       status: o.status, // enum cru — o front traduz (§8)
       paymentStatus: o.payment_status,
