@@ -9,5 +9,5 @@ export async function GET(request: Request) {
   const sp = new URL(request.url).searchParams;
   const q = sp.get("q") ?? "";
   const limit = Math.min(50, Number(sp.get("limit")) || 20);
-  return storefrontJson(await searchCatalog(q, limit), STOREFRONT_TAGS.items);
+  return storefrontJson(await searchCatalog(q, limit), STOREFRONT_TAGS.items, "search");
 }

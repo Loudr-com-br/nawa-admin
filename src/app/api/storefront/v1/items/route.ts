@@ -10,5 +10,5 @@ export async function GET(request: Request) {
   const q = sp.get("q") ?? undefined;
   const page = sp.get("page") ? Number(sp.get("page")) : undefined;
   const limit = sp.get("limit") ? Math.min(100, Number(sp.get("limit")) || 24) : undefined;
-  return storefrontJson(await getPublishedItems({ q, page, limit }), STOREFRONT_TAGS.items);
+  return storefrontJson(await getPublishedItems({ q, page, limit }), STOREFRONT_TAGS.items, "items");
 }

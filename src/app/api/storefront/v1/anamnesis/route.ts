@@ -5,5 +5,5 @@ import { STOREFRONT_TAGS } from "@/lib/storefront/purge";
 
 export async function GET(request: Request) {
   if (!(await authenticateStorefront(request))) return storefrontUnauthorized();
-  return storefrontJson(await getPublishedAnamnesis(), STOREFRONT_TAGS.anamnesis);
+  return storefrontJson(await getPublishedAnamnesis(), STOREFRONT_TAGS.anamnesis, "anamnesis");
 }

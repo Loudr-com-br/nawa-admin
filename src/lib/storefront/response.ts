@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { CONTRACT, type ContractKey } from "./contract";
 
 /**
  * Resposta JSON da Storefront com cache no edge/CDN.
@@ -17,7 +18,21 @@ import { NextResponse } from "next/server";
  * Quando algo é publicado no backoffice, o ideal é purgar/revalidar essa chave
  * de cache (roadmap em `.spec/escalabilidade.md`).
  */
-export function storefrontJson(data: unknown, cacheTag: string) {
+export function storefrontJson(data: unknown, cacheTag: string, contract?: ContractKey) {
+  // Auto-verificação de contrato (só fora de produção): se o backoffice produzir
+  // um shape fora do contrato, falha ALTO no teste/CI. Em produção NÃO validamos —
+  // um detalhe de schema jamais deve derrubar o catálogo público. Ver contract.ts.
+  if (contract && process.env.NODE_ENV !== "production") {
+    const result = CONTRACT[contract].safeParse(data);
+    if (!result.success) {
+      const issues = result.error.issues
+        .slice(0, 5)
+        .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
+        .join("; ");
+      throw new Error(`[storefront] contrato '${contract}' violado — ${issues}`);
+    }
+  }
+
   const cache = "public, max-age=0, s-maxage=60, stale-while-revalidate=300";
   return NextResponse.json(data, {
     headers: {
