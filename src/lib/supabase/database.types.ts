@@ -1102,6 +1102,7 @@ export type Database = {
       item_type: "manipulado" | "medicamento" | "suplemento" | "servico"
       order_item_ref_type: "plan" | "formula" | "product"
       order_status:
+        | "awaiting_payment"
         | "paid"
         | "in_production"
         | "shipped"
@@ -1260,7 +1261,14 @@ export const Constants = {
       content_status: ["draft", "published"],
       item_type: ["manipulado", "medicamento", "suplemento", "servico"],
       order_item_ref_type: ["plan", "formula", "product"],
-      order_status: ["paid", "in_production", "shipped", "delivered", "failed"],
+      order_status: [
+        "awaiting_payment",
+        "paid",
+        "in_production",
+        "shipped",
+        "delivered",
+        "failed",
+      ],
       payment_status: ["paid", "pending", "failed", "refunded"],
       pharmaceutical_form: [
         "capsula",

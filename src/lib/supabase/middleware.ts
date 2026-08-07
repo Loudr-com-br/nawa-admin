@@ -6,7 +6,7 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from "./config"
  * Rotas que dispensam a sessão Supabase. A Storefront e as superfícies de
  * escrita do front (evaluate/cart) autenticam por chave de API própria.
  */
-const PUBLIC_PATHS = ["/login", "/auth", "/api/storefront", "/api/anamnesis", "/api/cart", "/api/patient"];
+const PUBLIC_PATHS = ["/login", "/auth", "/api/storefront", "/api/anamnesis", "/api/cart", "/api/patient", "/api/checkout"];
 
 /**
  * Atualiza a sessão nos cookies e protege rotas.

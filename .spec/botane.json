@@ -1,0 +1,882 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Botane Data — API pública",
+    "version": "1.2.0",
+    "description": "API pública **máquina-a-máquina** do Botane Data. Cobre dois backends e três schemas distintos:\n\n### Backends\n1. **Lovable Cloud (interno)** — Postgres gerenciado onde ficam as tabelas modeladas do Botane Data. Toda ingestão, transformação e alerta é escrita aqui. É o backend padrão de `/api/public/dados/{tabela}` quando `?schema=` não é enviado.\n2. **Data Warehouse externo (Postgres botanedata / fcerta)** — fonte transacional original (pedidos, receitas, fórmulas, financeiro, dimensões corporativas). Acessível **somente-leitura** via `?schema=\u003Cnome\u003E` (transação read-only, timeout 20s).\n\n### Schemas\n| Schema | Backend | O que contém | Como consultar |\n| --- | --- | --- | --- |\n| `public` | Lovable Cloud | Camadas bronze/silver/gold do Botane Data, dimensões, ops, snapshots, watchlists, backfills `_historico`. Toda tabela listada em `/api/public/dados/_tabelas` mora aqui, salvo indicação contrária. | `/api/public/dados/{tabela}` (sem `?schema=`) |\n| `botane_data` | Lovable Cloud | Golds especiais que ficam **fora do PostgREST** por privacidade/custo (ex.: `gold_fat_prcusto_diario`). Servidas via conexão direta ao Postgres interno. | `/api/public/dados/{tabela}` (o roteador detecta e usa a rota direta) |\n| `dados` | DW externo | Fatos transacionais: `fat_pedidos`, `fat_pedidos_receitas`, `fat_pedidos_formulas`, `fat_orcamentos_*`, dimensões corporativas (`dim_medicos`, `dim_clientes`, `dim_produto`). Fonte de verdade dos processos de negócio. | `/api/public/dados/{tabela}?schema=dados` |\n| `dw` | DW externo | Camada legada UPPERCASE (ex.: `dw.\"MOVIMENTO_FINANCEIRO\"`). Consumida pelos hooks de gold; não expor diretamente a clientes. | `/api/public/dados/{tabela}?schema=dw` |\n| `public` (DW) | DW externo | Tabelas operacionais compartilhadas com outros sistemas (fcerta, phusion). | `/api/public/dados/{tabela}?schema=public` |\n| `config`, `crm`, `stage` | DW externo | Auxiliares — configuração, integrações CRM, staging bruto. Uso restrito. | `/api/public/dados/{tabela}?schema=\u003Cschema\u003E` |\n\n\u003E Regra prática: **golds e views modeladas → interno (sem `?schema=`)**. **Dados crus e transacionais → DW externo (com `?schema=dados` ou `?schema=public`)**.\n\n## Autenticação\nToda rota de dados exige uma **API key por usuário**, emitida em `/admin/users`. Envie por:\n- header `x-api-token: \u003Ckey\u003E` (preferido)\n- query `?token=\u003Ckey\u003E`\n- header `Authorization: Bearer \u003Ckey\u003E`\n\nCada request é registrada em `public.api_key_requests` (path, tabela, status, IP, duração). Keys revogadas retornam 401 imediatamente.\n\n## Rate limits e segurança\n- Timeout de 20s em toda leitura do DW externo, forçada em transação **read-only**.\n- Limit clampado em 1..1000; offset ≥ 0.\n- Hooks com escrita exigem permissão `can_run_hooks` na key.\n- `/api/public/heartbeat` é aberto (sem key) e retorna 503 quando algum backend está degradado — use em uptime checks.\n\n\n# Metodologia — Botane Data\n\n## 1. Camadas do Data Warehouse (Medallion Architecture)\n\nO pipeline segue a arquitetura **Bronze → Silver → Gold**, alinhada a DMBOK 2.0 (capítulo de Data Warehousing) e ao modelo Kimball (star schema, grão explícito, surrogate keys):\n\n- **Bronze** (`fat_preco_deltas_botanedata`): ingestão bruta, fiel à origem, sem regras de negócio. Serve como fonte de verdade auditável.\n- **Silver** (`fat_preco_snapshot_silver`): dados validados, tipados, deduplicados e enriquecidos com dimensões (`sk_produto`, `flag_zerado`). É a única camada consumida pelas Gold.\n- **Gold**: modelos de consumo, um por caso de uso analítico. Podem ser fatos (`gold_fat_*`) ou views semânticas (`fat_preco_zero_snapshot`, `fat_delta_preco_custo_compra`).\n\n## 2. Dimensões\n\n`dim_produto` é a única dimensão persistida hoje (SCD Type 2 simplificado — mantemos apenas a versão vigente via `is_current=true`, com `sk_produto` como surrogate key para joins estáveis mesmo que o `id_produto` natural mude de significado).\n\n## 3. Grão e nomenclatura das Gold\n\nToda tabela Gold declara **um único grão** e o expõe no nome:\n\n- `gold_fat_\u003Centidade\u003E_\u003Cperspectiva\u003E`: fato agregado (ex.: `gold_fat_receita_diaria` = grão dia).\n- `gold_fato_\u003Cprocesso\u003E`: fato transacional 1:1 com evento (ex.: `gold_fato_movimento_financeiro`).\n- Sufixo `_historico`: backfill idempotente das mesmas gold para períodos anteriores.\n\n## 4. Janelas fechadas (geração por entidade)\n\nAs tabelas `gold_fat_prescritores_geracao`, `gold_fat_visitadores_geracao` e `gold_fat_clientes_geracao` usam **janelas de tempo fechadas** — sempre o período completo anterior ao momento do refresh:\n\n- semana ISO passada (segunda a domingo);\n- mês anterior completo;\n- ano anterior completo;\n- 5 anos anteriores completos.\n\nCada refresh **substitui integralmente** a tabela (idempotência total). Nunca há incremento parcial — isso elimina desvios acumulados e facilita reproduzir qualquer estado.\n\n## 5. Receita: por que dois grãos separados\n\n`gold_fat_receita_diaria`, `_mensal`, `_anual` são geradas em conjunto pelo mesmo hook porque compartilham as regras de negócio críticas:\n\n- fonte = `dados.fat_pedidos_receitas` ∪ `dados.fat_orcamentos_receitas`;\n- valor = `valor_final` (líquido);\n- aprovação = `EXISTS` em `dados.fat_pedidos` com `id_pedido = id_orcamento` (evita duplicar orçamento + pedido);\n- grão de linha = receita (não pedido) para preservar detalhamento por item.\n\n## 6. Farmacotécnica derivada de comportamento real\n\n`fat_produto_farmacotecnica` **não copia** o cadastro — ela é reconstruída do modo/mediana observado em `dados.fat_pedidos_formulas`. Isso corrige ativos com fator errado no cadastro (`fat_fator_zero_snapshot`) e adapta-se automaticamente a mudanças de forma comercial (ex.: betacaroteno em pó puro vs. beadlet).\n\n## 7. ACID, idempotência e concorrência\n\n- Todos os refresh de gold rodam em **uma transação** por hook (BEGIN/COMMIT) — leitura consistente, rollback total em falha.\n- Refreshes são **idempotentes**: rodar 2× seguidas produz o mesmo estado.\n- Escritas na API pública passam por `SET LOCAL default_transaction_read_only = on` + `statement_timeout = '20s'` — impossível corromper o DW externo por uma query malformada.\n- Alertas por email têm janela de deduplicação de 55 min (`email_notified_price_snapshots`) — não há flood.\n\n## 8. Segurança\n\n- **API keys por usuário** (não uma chave global): SHA-256 armazenada em `user_api_keys`, valor pleno mostrado apenas no momento da criação.\n- Cada request é registrada em `api_key_requests` (path, tabela, status, IP, duração).\n- Permissão fina `can_run_hooks` — nem toda key pode disparar hooks caros/destrutivos.\n- RLS habilitada em 100% das tabelas do schema `public`. Funções `SECURITY DEFINER` com `REVOKE` explícito em `PUBLIC/anon`.\n\n## 9. Observabilidade\n\n- `dw_refresh_log` registra cada execução de hook.\n- `/api/public/heartbeat?deep=1` valida Lovable Cloud + DW externo.\n- Página `/status` na UI exibe o log de refresh das gold em tempo real.\n\n\n## Endpoints em resumo\n- `GET /api/public/heartbeat` — saúde do serviço. `?deep=1` valida Lovable Cloud + DW.\n- `GET /api/public/dados/_tabelas` — allowlist do banco interno.\n- `GET /api/public/dados/{tabela}` — leitura de qualquer tabela interna (allowlist) ou do DW externo (`?schema=`).\n- `POST /api/public/hooks/*` — refresh das camadas gold e envio de alertas.\n\n## Contrato de resposta\nTodas as respostas usam o envelope `{ ok: boolean, ... }`. Erros seguem `{ ok: false, erro: string }` com HTTP status apropriado (400 identificador inválido, 401 auth, 404 tabela não liberada, 500 falha interna).",
+    "contact": {
+      "name": "Botane Data"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://fcerta-btne-data.lovable.app"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Uptime e checagem profunda dos backends"
+    },
+    {
+      "name": "Dados",
+      "description": "Leitura de tabelas/views do banco interno e do DW externo"
+    },
+    {
+      "name": "Hooks",
+      "description": "Endpoints de manutenção (refresh de cache / snapshots / alertas)"
+    },
+    {
+      "name": "Meta",
+      "description": "Metadados da API"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-token",
+        "description": "API key emitida em /admin/users. Header preferido."
+      },
+      "ApiKeyQuery": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "token",
+        "description": "Mesma API key, via query string (útil para navegadores)."
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Envie `Authorization: Bearer \u003Capi-key\u003E`."
+      }
+    },
+    "parameters": {
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "description": "Número máximo de linhas (1..1000). Padrão 100.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 100
+        }
+      },
+      "Offset": {
+        "name": "offset",
+        "in": "query",
+        "description": "Deslocamento para paginação.",
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        }
+      },
+      "Schema": {
+        "name": "schema",
+        "in": "query",
+        "description": "Schema do DW externo (Postgres botanedata). Envie qualquer valor diferente de `botane_data` para consultar o DW — por exemplo `dados` ou `public`. Omita para acessar as tabelas internas listadas em `/api/public/dados/_tabelas`.",
+        "schema": {
+          "type": "string",
+          "example": "dados"
+        }
+      },
+      "Tabela": {
+        "name": "tabela",
+        "in": "path",
+        "required": true,
+        "description": "Nome da tabela/view. Use `_tabelas` para listar as internas.\n\n**Tabelas gold documentadas (banco interno):**\n\n- `fat_preco_zerado_gold` — 1 linha por (id_produto, snapshot_at) com preço 0. Camada gold: subconjunto de silver onde prcompra=0 ou prcusto=0. Usada para o painel de auditoria de preços zerados e para os alertas por email.\n- `fat_preco_oscilacao_gold` — 1 linha por par (snapshot_prior, snapshot_recent) para cada id_produto. Camada gold: variação entre dois snapshots consecutivos por produto, com % de mudança e flag_relevante (|Δ%| ≥ 10). Base do alerta 'oscilação de preços'.\n- `fat_fator_zero_snapshot` — 1 linha por (snapshot_at, id_produto) com fator=0 ou NULL. Snapshot de produtos cadastrados com fator farmacotécnico zero/nulo — problema crítico pois quebra a diluição de fórmulas.\n- `fat_preco_zero_snapshot` — view derivada de fat_preco_zerado_gold. View somente-leitura que expõe fat_preco_zerado_gold com o naming solicitado pelo produto.\n- `fat_delta_preco_custo_compra` — view derivada de fat_preco_snapshot_silver. View que compara prcompra vs prcusto no snapshot mais recente e materializa o gap.\n- `fat_produto_farmacotecnica` — 1 linha por id_produto. Lookup de dados farmacotécnicos consolidados por produto (fator, densidade, forma, unidade). Deriva do modo/mediana observado em dados.fat_pedidos_formulas — reflete o comportamento real das fórmulas, não a interpretação de um único pedido.\n- `fat_produto_farmacotecnica_hist` — 1 linha por (id_produto, snapshot_at). Histórico dos snapshots da farmacotécnica, para auditoria e comparação temporal.\n- `gold_fat_prescritores_geracao` — 1 linha por CRM (prescritor). Geração por prescritor em janelas de tempo FECHADAS (semana ISO passada, mês anterior, ano anterior e 5 anos anteriores). Métricas: pedidos, receitas, fórmulas manipuladas e valor faturado por janela. Modelo dimensional inspirado em DMBOK/Kimball — grão único, chaves de negócio explícitas, sem duplicação.\n- `gold_fat_visitadores_geracao` — 1 linha por id_visitador. Geração por propagandista/visitador em janelas fechadas. Mesma metodologia de gold_fat_prescritores_geracao — snapshot recalculado (não incremental) para garantir idempotência.\n- `gold_fat_clientes_geracao` — 1 linha por id_cliente. Geração por cliente em janelas fechadas (semana/mês/ano/5 anos). Inclui contagem de CRMs distintos atendidos ao cliente.\n- `gold_fat_prescritores_geracao_historico` — 1 linha por (prescritor, cliente, dia). Backfill histórico diário da geração por prescritor e cliente, derivado da bronze local tbl_sales. Inclui pedidos, receitas, fórmulas e valores aprovados/orçados, além de IDs determinísticos para análises de recorrência.\n- `gold_fat_clientes_geracao_historico` — 1 linha por (cliente, dia). Backfill histórico diário da geração por cliente, com prescritores distintos, pedidos, receitas, fórmulas e valores aprovados/orçados. O id_cliente é determinístico por nome normalizado para suportar same-client-sale.\n- `gold_fato_movimento_financeiro` — 1 linha por transação financeira (id_movimento). Espelho normalizado de dw.\"MOVIMENTO_FINANCEIRO\" — despesas, receitas e conciliação. Colunas monetárias convertidas para NUMERIC, datas para DATE. Usado para o painel financeiro e para BI externo.\n- `gold_fat_receita_diaria` — 1 linha por dia. Receita LÍQUIDA por dia: soma de valor_final em dados.fat_pedidos_receitas (vendas) e dados.fat_orcamentos_receitas (orçamentos). Marca aprovado=true quando existe pedido correspondente (EXISTS em dados.fat_pedidos com id_pedido=id_orcamento). Sem duplicidade entre orçamento e pedido.\n- `gold_fat_receita_mensal` — 1 linha por mês (ano_mes). Agregação mensal derivada de gold_fat_receita_diaria. Mesma metodologia de valor líquido e aprovação.\n- `gold_fat_receita_anual` — 1 linha por ano. Agregação anual derivada de gold_fat_receita_diaria.\n- `gold_fat_prcusto_diario` — 1 linha por dia — schema botane_data. CMV diário (soma de prcusto no grão receita/fórmula em dados.fat_pedidos_receitas), nº de fórmulas/séries e nº de pedidos. `dados.fat_pedidos_formulas` é grão componente/ativo e não deve ser contado como fórmula, para evitar inflação. Reside em `botane_data.gold_fat_prcusto_diario` (schema reservado para tabelas gold). Coluna fonte identifica a origem: 'phusion' = backfill histórico (tbl_sales / pedidos_crm) e 'fcerta' = extração recorrente do DW (schema dados). Histórico phusion é preservado; hook fcerta faz insert-only nas datas ainda inexistentes.\n- `gold_fat_receita_diaria_historico` — 1 linha por dia (backfill). Backfill histórico da receita diária com clientes/prescritores distintos e separação aprovado vs. orçado a partir da bronze local tbl_sales.\n- `gold_fat_receita_mensal_historico` — 1 linha por mês (backfill). Backfill histórico da receita mensal com clientes/prescritores distintos e separação aprovado vs. orçado.\n- `gold_fat_receita_anual_historico` — 1 linha por ano (backfill). Backfill histórico da receita anual com clientes/prescritores distintos e separação aprovado vs. orçado.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "bronze_tbl_sales_lightsail",
+            "dim_produto",
+            "dw_cache",
+            "dw_refresh_log",
+            "email_notified_price_snapshots",
+            "email_report_subscriptions",
+            "fat_fator_zero_snapshot",
+            "fat_delta_preco_custo_compra",
+            "fat_preco_deltas_botanedata",
+            "fat_preco_oscilacao_gold",
+            "fat_preco_snapshot_silver",
+            "fat_preco_zero_snapshot",
+            "fat_preco_zerado_gold",
+            "fat_produto_farmacotecnica",
+            "fat_produto_farmacotecnica_hist",
+            "gold_fat_prescritores_geracao",
+            "gold_fat_visitadores_geracao",
+            "gold_fat_clientes_geracao",
+            "gold_fato_movimento_financeiro",
+            "gold_fat_receita_diaria",
+            "gold_fat_receita_mensal",
+            "gold_fat_receita_anual",
+            "gold_fat_prcusto_diario",
+            "gold_fat_prescritores_geracao_historico",
+            "gold_fat_clientes_geracao_historico",
+            "gold_fat_receita_diaria_historico",
+            "gold_fat_receita_mensal_historico",
+            "gold_fat_receita_anual_historico",
+            "precos_dismissed_zerados",
+            "precos_price_change_watchlist",
+            "user_roles",
+            "user_tab_permissions"
+          ]
+        }
+      }
+    },
+    "schemas": {
+      "Erro": {
+        "type": "object",
+        "required": [
+          "ok",
+          "erro"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [false]
+          },
+          "erro": {
+            "type": "string"
+          }
+        }
+      },
+      "LinhasResposta": {
+        "type": "object",
+        "required": [
+          "ok",
+          "tabela",
+          "linhas"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "tabela": {
+            "type": "string"
+          },
+          "schema": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Total de linhas quando a tabela é interna."
+          },
+          "limite": {
+            "type": "integer"
+          },
+          "deslocamento": {
+            "type": "integer"
+          },
+          "linhas": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      },
+      "TabelasResposta": {
+        "type": "object",
+        "required": [
+          "ok",
+          "tabelas_internas",
+          "dw"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "tabelas_internas": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "bronze_tbl_sales_lightsail",
+                "dim_produto",
+                "dw_cache",
+                "dw_refresh_log",
+                "email_notified_price_snapshots",
+                "email_report_subscriptions",
+                "fat_fator_zero_snapshot",
+                "fat_delta_preco_custo_compra",
+                "fat_preco_deltas_botanedata",
+                "fat_preco_oscilacao_gold",
+                "fat_preco_snapshot_silver",
+                "fat_preco_zero_snapshot",
+                "fat_preco_zerado_gold",
+                "fat_produto_farmacotecnica",
+                "fat_produto_farmacotecnica_hist",
+                "gold_fat_prescritores_geracao",
+                "gold_fat_visitadores_geracao",
+                "gold_fat_clientes_geracao",
+                "gold_fato_movimento_financeiro",
+                "gold_fat_receita_diaria",
+                "gold_fat_receita_mensal",
+                "gold_fat_receita_anual",
+                "gold_fat_prcusto_diario",
+                "gold_fat_prescritores_geracao_historico",
+                "gold_fat_clientes_geracao_historico",
+                "gold_fat_receita_diaria_historico",
+                "gold_fat_receita_mensal_historico",
+                "gold_fat_receita_anual_historico",
+                "precos_dismissed_zerados",
+                "precos_price_change_watchlist",
+                "user_roles",
+                "user_tab_permissions"
+              ]
+            }
+          },
+          "dw": {
+            "type": "object",
+            "properties": {
+              "descricao": {
+                "type": "string"
+              },
+              "exemplo": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "HookOk": {
+        "type": "object",
+        "required": [
+          "ok"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "elapsed_ms": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": true
+      },
+      "Heartbeat": {
+        "type": "object",
+        "required": [
+          "ok",
+          "status",
+          "service",
+          "now"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "degraded"
+            ]
+          },
+          "service": {
+            "type": "string",
+            "example": "botane-data-api"
+          },
+          "version": {
+            "type": "string",
+            "example": "1.0.0"
+          },
+          "now": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "uptime_check_ms": {
+            "type": "integer"
+          },
+          "origin": {
+            "type": "string"
+          },
+          "checks": {
+            "type": "object",
+            "nullable": true,
+            "description": "Presente apenas com ?deep=1.",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "ok": {
+                  "type": "boolean"
+                },
+                "latency_ms": {
+                  "type": "integer"
+                },
+                "error": {
+                  "type": "string",
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "hint": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "ApiKeyHeader": []
+    },
+    {
+      "ApiKeyQuery": []
+    },
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/api/public/heartbeat": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Heartbeat / status do serviço",
+        "description": "Endpoint aberto (sem API key) para uptime checks, load balancers e clientes MCP.\n\n- Sem parâmetro: responde imediatamente com metadados do processo.\n- Com `?deep=1`: executa `SELECT` trivial no Lovable Cloud e no DW externo e retorna 503 se algum estiver indisponível.\n\nNunca retorna dados de negócio — seguro para chamar de qualquer origem.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "deep",
+            "in": "query",
+            "description": "Se `1`, executa checagens profundas (Lovable Cloud + DW).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "0",
+                "1"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Serviço saudável",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Heartbeat"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Algum backend degradado (só ocorre com ?deep=1)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Heartbeat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/dados/_tabelas": {
+      "get": {
+        "tags": [
+          "Meta"
+        ],
+        "summary": "Lista as tabelas internas liberadas",
+        "description": "Retorna o allowlist das tabelas do banco interno e uma dica de uso do DW externo via `?schema=`.",
+        "responses": {
+          "200": {
+            "description": "Lista de tabelas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TabelasResposta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key ausente/ inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/dados/{tabela}": {
+      "get": {
+        "tags": [
+          "Dados"
+        ],
+        "summary": "Lê linhas de uma tabela/view (interna ou DW externo)",
+        "description": "Sem `?schema=`: lê da lista de tabelas internas (banco Lovable Cloud). Com `?schema=\u003Cnome\u003E` (diferente de `botane_data`): lê do DW externo em modo somente-leitura, transação com `statement_timeout=20s` e `default_transaction_read_only=on`.\n\n### Documentação por tabela interna\n\n#### `bronze_tbl_sales_lightsail`\n**Camada:** BRONZE · **Grão:** 1 linha por item/fórmula importada do tbl_sales\n\nBronze local importada do arquivo histórico tbl_sales. Preserva datas, pedido, série, paciente/beneficiário, médico, status financeiro, produto, quantidade, receita e custo para backfill auditável das golds históricas.\n\n**Atualização:** Carga controlada por arquivo de origem; serve como fonte local para refresh_historico_from_bronze().\n\n**Chaves:** row_unique_id, order_id, series\n\n#### `dim_produto`\n**Camada:** DIM · **Grão:** 1 linha por versão vigente de produto\n\nDimensão de produto (SCD Type 2 simplificado). is_current=true indica a versão ativa. sk_produto é a surrogate key usada por Silver/Gold.\n\n**Atualização:** Recriada em rebuild_precos_dw() a partir do snapshot mais recente de fat_preco_deltas_botanedata.\n\n**Chaves:** sk_produto (PK), id_produto (natural key)\n\n#### `dw_cache`\n**Camada:** OPS · **Grão:** chave/valor\n\nCache de payloads pesados do DW (linhas materializadas por tabela). Reduz custo de leitura repetida no botanedata.\n\n**Atualização:** Hook refresh-dw-cache.\n\n#### `dw_refresh_log`\n**Camada:** OPS · **Grão:** 1 linha por execução de hook\n\nLog estruturado de cada refresh de gold/silver — nome do hook, duração, contagens, status.\n\n**Atualização:** Append-only por cada hook.\n\n#### `email_notified_price_snapshots`\n**Camada:** OPS · **Grão:** 1 linha por email disparado\n\nDeduplicação dos alertas de preço: se um snapshot já foi notificado na última janela, o hook send-price-alerts o ignora (evita flood).\n\n**Atualização:** Hook send-price-alerts.\n\n#### `email_report_subscriptions`\n**Camada:** OPS · **Grão:** 1 linha por email de destino\n\nAssinantes que recebem o relatório combinado de preços/fator.\n\n**Atualização:** Gerenciada pelo admin na UI.\n\n#### `fat_fator_zero_snapshot`\n**Camada:** GOLD · **Grão:** 1 linha por (snapshot_at, id_produto) com fator=0 ou NULL\n\nSnapshot de produtos cadastrados com fator farmacotécnico zero/nulo — problema crítico pois quebra a diluição de fórmulas.\n\n**Atualização:** Hook refresh-fator-zero (diário).\n\n#### `fat_delta_preco_custo_compra`\n**Camada:** GOLD · **Grão:** view derivada de fat_preco_snapshot_silver\n\nView que compara prcompra vs prcusto no snapshot mais recente e materializa o gap.\n\n**Atualização:** View — sempre em tempo real.\n\n#### `fat_preco_deltas_botanedata`\n**Camada:** BRONZE · **Grão:** 1 linha por (id_produto, snapshot_at)\n\nCamada bronze: cópia bruta dos preços de compra/custo capturados no DW externo em cada snapshot. Sem regras de negócio.\n\n**Atualização:** Populada pelos hooks de captura de preços do DW; nunca editada manualmente.\n\n#### `fat_preco_oscilacao_gold`\n**Camada:** GOLD · **Grão:** 1 linha por par (snapshot_prior, snapshot_recent) para cada id_produto\n\nCamada gold: variação entre dois snapshots consecutivos por produto, com % de mudança e flag_relevante (|Δ%| ≥ 10). Base do alerta 'oscilação de preços'.\n\n**Atualização:** TRUNCATE + INSERT em rebuild_precos_dw().\n\n#### `fat_preco_snapshot_silver`\n**Camada:** SILVER · **Grão:** 1 linha por (id_produto, snapshot_at)\n\nCamada silver: mesmos preços da bronze, porém validados (tipos numéricos, joins com dim_produto), com flag_zerado calculada e sk_produto materializada. É a base de todas as agregações.\n\n**Atualização:** Recriada em rebuild_precos_dw().\n\n#### `fat_preco_zero_snapshot`\n**Camada:** GOLD · **Grão:** view derivada de fat_preco_zerado_gold\n\nView somente-leitura que expõe fat_preco_zerado_gold com o naming solicitado pelo produto.\n\n**Atualização:** View — reflete a gold em tempo real.\n\n#### `fat_preco_zerado_gold`\n**Camada:** GOLD · **Grão:** 1 linha por (id_produto, snapshot_at) com preço 0\n\nCamada gold: subconjunto de silver onde prcompra=0 ou prcusto=0. Usada para o painel de auditoria de preços zerados e para os alertas por email.\n\n**Atualização:** TRUNCATE + INSERT em rebuild_precos_dw().\n\n#### `fat_produto_farmacotecnica`\n**Camada:** GOLD · **Grão:** 1 linha por id_produto\n\nLookup de dados farmacotécnicos consolidados por produto (fator, densidade, forma, unidade). Deriva do modo/mediana observado em dados.fat_pedidos_formulas — reflete o comportamento real das fórmulas, não a interpretação de um único pedido.\n\n**Atualização:** Hook refresh-farmacotec (diário, 03:00 UTC via pg_cron).\n\n#### `fat_produto_farmacotecnica_hist`\n**Camada:** GOLD · **Grão:** 1 linha por (id_produto, snapshot_at)\n\nHistórico dos snapshots da farmacotécnica, para auditoria e comparação temporal.\n\n**Atualização:** Append-only pelo hook refresh-farmacotec.\n\n#### `gold_fat_prescritores_geracao`\n**Camada:** GOLD · **Grão:** 1 linha por CRM (prescritor)\n\nGeração por prescritor em janelas de tempo FECHADAS (semana ISO passada, mês anterior, ano anterior e 5 anos anteriores). Métricas: pedidos, receitas, fórmulas manipuladas e valor faturado por janela. Modelo dimensional inspirado em DMBOK/Kimball — grão único, chaves de negócio explícitas, sem duplicação.\n\n**Atualização:** Hook refresh-prescritores-geracao (diário).\n\n**Chaves:** crm\n\n#### `gold_fat_visitadores_geracao`\n**Camada:** GOLD · **Grão:** 1 linha por id_visitador\n\nGeração por propagandista/visitador em janelas fechadas. Mesma metodologia de gold_fat_prescritores_geracao — snapshot recalculado (não incremental) para garantir idempotência.\n\n**Atualização:** Hook refresh-visitadores-geracao (diário).\n\n**Chaves:** id_visitador\n\n#### `gold_fat_clientes_geracao`\n**Camada:** GOLD · **Grão:** 1 linha por id_cliente\n\nGeração por cliente em janelas fechadas (semana/mês/ano/5 anos). Inclui contagem de CRMs distintos atendidos ao cliente.\n\n**Atualização:** Hook refresh-clientes-geracao (diário).\n\n**Chaves:** id_cliente\n\n#### `gold_fato_movimento_financeiro`\n**Camada:** GOLD · **Grão:** 1 linha por transação financeira (id_movimento)\n\nEspelho normalizado de dw.\"MOVIMENTO_FINANCEIRO\" — despesas, receitas e conciliação. Colunas monetárias convertidas para NUMERIC, datas para DATE. Usado para o painel financeiro e para BI externo.\n\n**Atualização:** Hook refresh-movimento-financeiro (diário).\n\n#### `gold_fat_receita_diaria`\n**Camada:** GOLD · **Grão:** 1 linha por dia\n\nReceita LÍQUIDA por dia: soma de valor_final em dados.fat_pedidos_receitas (vendas) e dados.fat_orcamentos_receitas (orçamentos). Marca aprovado=true quando existe pedido correspondente (EXISTS em dados.fat_pedidos com id_pedido=id_orcamento). Sem duplicidade entre orçamento e pedido.\n\n**Atualização:** Hook refresh-receita.\n\n#### `gold_fat_receita_mensal`\n**Camada:** GOLD · **Grão:** 1 linha por mês (ano_mes)\n\nAgregação mensal derivada de gold_fat_receita_diaria. Mesma metodologia de valor líquido e aprovação.\n\n**Atualização:** Hook refresh-receita.\n\n#### `gold_fat_receita_anual`\n**Camada:** GOLD · **Grão:** 1 linha por ano\n\nAgregação anual derivada de gold_fat_receita_diaria.\n\n**Atualização:** Hook refresh-receita.\n\n#### `gold_fat_prcusto_diario`\n**Camada:** GOLD · **Grão:** 1 linha por dia — schema botane_data\n\nCMV diário (soma de prcusto no grão receita/fórmula em dados.fat_pedidos_receitas), nº de fórmulas/séries e nº de pedidos. `dados.fat_pedidos_formulas` é grão componente/ativo e não deve ser contado como fórmula, para evitar inflação. Reside em `botane_data.gold_fat_prcusto_diario` (schema reservado para tabelas gold). Coluna fonte identifica a origem: 'phusion' = backfill histórico (tbl_sales / pedidos_crm) e 'fcerta' = extração recorrente do DW (schema dados). Histórico phusion é preservado; hook fcerta faz insert-only nas datas ainda inexistentes.\n\n**Atualização:** Hook refresh-prcusto-diario (diário).\n\n**Chaves:** dia (PK)\n\n#### `gold_fat_prescritores_geracao_historico`\n**Camada:** GOLD · **Grão:** 1 linha por (prescritor, cliente, dia)\n\nBackfill histórico diário da geração por prescritor e cliente, derivado da bronze local tbl_sales. Inclui pedidos, receitas, fórmulas e valores aprovados/orçados, além de IDs determinísticos para análises de recorrência.\n\n**Atualização:** Populado pela rotina refresh_historico_from_bronze('prescritores').\n\n#### `gold_fat_clientes_geracao_historico`\n**Camada:** GOLD · **Grão:** 1 linha por (cliente, dia)\n\nBackfill histórico diário da geração por cliente, com prescritores distintos, pedidos, receitas, fórmulas e valores aprovados/orçados. O id_cliente é determinístico por nome normalizado para suportar same-client-sale.\n\n**Atualização:** Populado pela rotina refresh_historico_from_bronze('clientes').\n\n#### `gold_fat_receita_diaria_historico`\n**Camada:** GOLD · **Grão:** 1 linha por dia (backfill)\n\nBackfill histórico da receita diária com clientes/prescritores distintos e separação aprovado vs. orçado a partir da bronze local tbl_sales.\n\n**Atualização:** Populado pela rotina refresh_historico_from_bronze('diaria').\n\n#### `gold_fat_receita_mensal_historico`\n**Camada:** GOLD · **Grão:** 1 linha por mês (backfill)\n\nBackfill histórico da receita mensal com clientes/prescritores distintos e separação aprovado vs. orçado.\n\n**Atualização:** Populado pela rotina refresh_historico_from_bronze('mensal').\n\n#### `gold_fat_receita_anual_historico`\n**Camada:** GOLD · **Grão:** 1 linha por ano (backfill)\n\nBackfill histórico da receita anual com clientes/prescritores distintos e separação aprovado vs. orçado.\n\n**Atualização:** Populado pela rotina refresh_historico_from_bronze('anual').\n\n#### `precos_dismissed_zerados`\n**Camada:** OPS · **Grão:** 1 linha por (id_produto, user) dispensado\n\nMarcações de 'ignorar este produto zerado' feitas pelos usuários na auditoria.\n\n**Atualização:** UI de preços.\n\n#### `precos_price_change_watchlist`\n**Camada:** OPS · **Grão:** 1 linha por (id_produto, user)\n\nWatchlist de produtos que o usuário quer acompanhar mesmo abaixo do threshold de 10%.\n\n**Atualização:** UI de preços.\n\n#### `user_roles`\n**Camada:** OPS · **Grão:** 1 linha por (user_id, role)\n\nPapéis por usuário (admin, viewer etc.). Nunca armazenados no perfil — separação obrigatória para evitar escalada de privilégio.\n\n**Atualização:** Admin.\n\n#### `user_tab_permissions`\n**Camada:** OPS · **Grão:** 1 linha por (user_id, tab)\n\nPermissões finas por aba da UI (ex.: quem enxerga preços, quem enxerga movimento financeiro).\n\n**Atualização:** Admin.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Tabela"
+          },
+          {
+            "$ref": "#/components/parameters/Schema"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinhasResposta"
+                },
+                "examples": {
+                  "interno": {
+                    "summary": "Tabela interna",
+                    "value": {
+                      "ok": true,
+                      "tabela": "fat_fator_zero_snapshot",
+                      "total": 42,
+                      "limite": 100,
+                      "deslocamento": 0,
+                      "linhas": []
+                    }
+                  },
+                  "dw": {
+                    "summary": "DW externo (?schema=dados)",
+                    "value": {
+                      "ok": true,
+                      "tabela": "fat_pedidos_formulas",
+                      "schema": "dados",
+                      "limite": 50,
+                      "deslocamento": 0,
+                      "linhas": []
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Identificador inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key ausente/ inválida/ revogada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tabela não liberada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro do servidor/DW",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/hooks/refresh-dw-cache": {
+      "post": {
+        "tags": [
+          "Hooks"
+        ],
+        "summary": "Reconstrói o cache do DW e o snapshot de preços",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HookOk"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Falha",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/hooks/refresh-farmacotec": {
+      "post": {
+        "tags": [
+          "Hooks"
+        ],
+        "summary": "Reconstrói dados farmacotécnicos a partir do DW",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HookOk"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Falha",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/hooks/refresh-fator-zero": {
+      "post": {
+        "tags": [
+          "Hooks"
+        ],
+        "summary": "Atualiza o snapshot de produtos com fator zero/nulo",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HookOk"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Falha",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/hooks/send-price-alerts": {
+      "post": {
+        "tags": [
+          "Hooks"
+        ],
+        "summary": "Envia o email de alerta de oscilação/zerados de preços",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HookOk"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Falha",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/hooks/refresh-prescritores-geracao": {
+      "post": {
+        "tags": [
+          "Hooks"
+        ],
+        "summary": "Recalcula gold_fat_prescritores_geracao (janelas fechadas: semana, mês, ano, 5 anos)",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HookOk"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Falha",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/hooks/refresh-visitadores-geracao": {
+      "post": {
+        "tags": [
+          "Hooks"
+        ],
+        "summary": "Recalcula gold_fat_visitadores_geracao (janelas fechadas: semana, mês, ano, 5 anos)",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HookOk"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Falha",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/hooks/refresh-clientes-geracao": {
+      "post": {
+        "tags": [
+          "Hooks"
+        ],
+        "summary": "Recalcula gold_fat_clientes_geracao (janelas fechadas: semana, mês, ano, 5 anos)",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HookOk"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Falha",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/hooks/refresh-movimento-financeiro": {
+      "post": {
+        "tags": [
+          "Hooks"
+        ],
+        "summary": "Sincroniza gold_fato_movimento_financeiro a partir de dw.MOVIMENTO_FINANCEIRO",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HookOk"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Falha",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/hooks/refresh-receita": {
+      "post": {
+        "tags": [
+          "Hooks"
+        ],
+        "summary": "Recalcula receita diária/mensal/anual (líquida, sem duplicatas)",
+        "description": "Fonte: dados.fat_pedidos_receitas (vendas) + dados.fat_orcamentos_receitas (orçamentos). Aprovação: EXISTS em dados.fat_pedidos com id_pedido = id_orcamento. Grão receita, valor_final líquido. Popula gold_fat_receita_diaria, gold_fat_receita_mensal e gold_fat_receita_anual.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HookOk"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Falha",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/hooks/refresh-prcusto-diario": {
+      "post": {
+        "tags": [
+          "Hooks"
+        ],
+        "summary": "Recalcula botane_data.gold_fat_prcusto_diario (CMV, nº de fórmulas e pedidos por dia)",
+        "description": "Fonte: dados.fat_pedidos_receitas (grão receita/fórmula). num_formulas = COUNT(DISTINCT id_pedido_receita); num_pedidos = COUNT(DISTINCT id_pedido); vlr_cmv = SUM(prcusto). Marca fonte='fcerta' e tem prioridade sobre o backfill 'phusion' nos dias sobrepostos.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HookOk"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Falha",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/hooks/refresh-historico": {
+      "post": {
+        "tags": [
+          "Hooks"
+        ],
+        "summary": "Reprocessa os backfills _historico a partir de bronze_tbl_sales_lightsail",
+        "description": "Recalcula uma das gold históricas conforme o parâmetro `grao`: prescritores, clientes, diaria, mensal, anual, ou src-counts (apenas conta linhas na fonte). Fonte: public.bronze_tbl_sales_lightsail; deduplicação por (numero_pedido, serie_pedido); aprovação por financial_status ∈ {Pago, Convênio, Parcialmente Pago, ...}. Idempotente: substitui integralmente a gold do grão escolhido.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "grao",
+            "in": "query",
+            "description": "Grão a reprocessar.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "src-counts",
+                "prescritores",
+                "clientes",
+                "diaria",
+                "mensal",
+                "anual"
+              ],
+              "default": "src-counts"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HookOk"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Falha",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
