@@ -17,13 +17,17 @@ export function extractKey(request: Request): string | null {
 const LAST_USED_THROTTLE_MS = 5 * 60 * 1000;
 
 /**
- * Valida a chave da Storefront. Retorna true se ativa.
+ * Valida a chave da Storefront. Retorna `{ keyId }` se ativa, senão `null`.
  * Usa o client admin (bypassa RLS) — a Storefront não tem sessão Supabase.
  * `last_used_at` é atualizado no máximo a cada 5 min (throttle).
+ *
+ * O `keyId` alimenta o rate limiting por chave (ver rate-limit.ts). Callers que
+ * só precisam do sim/não usam `if (!(await authenticateStorefront(req)))` — segue
+ * funcionando (objeto é truthy, null é falsy).
  */
-export async function authenticateStorefront(request: Request): Promise<boolean> {
+export async function authenticateStorefront(request: Request): Promise<{ keyId: string } | null> {
   const raw = extractKey(request);
-  if (!raw) return false;
+  if (!raw) return null;
 
   const supabase = createAdminClient();
   const { data } = await supabase
@@ -32,7 +36,7 @@ export async function authenticateStorefront(request: Request): Promise<boolean>
     .eq("key_hash", hashApiKey(raw))
     .maybeSingle();
 
-  if (!data || data.status !== "active") return false;
+  if (!data || data.status !== "active") return null;
 
   const last = data.last_used_at ? new Date(data.last_used_at).getTime() : 0;
   if (Date.now() - last > LAST_USED_THROTTLE_MS) {
@@ -42,5 +46,5 @@ export async function authenticateStorefront(request: Request): Promise<boolean>
       .eq("id", data.id);
   }
 
-  return true;
+  return { keyId: data.id };
 }

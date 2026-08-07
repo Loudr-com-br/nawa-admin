@@ -955,6 +955,32 @@ export type Database = {
           },
         ]
       }
+      storefront_rate_limits: {
+        Row: {
+          count: number
+          key_id: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          key_id: string
+          window_start: string
+        }
+        Update: {
+          count?: number
+          key_id?: string
+          window_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storefront_rate_limits_key_id_fkey"
+            columns: ["key_id"]
+            isOneToOne: false
+            referencedRelation: "api_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscription_lines: {
         Row: {
           created_at: string
@@ -1121,6 +1147,14 @@ export type Database = {
       is_super_admin: { Args: never; Returns: boolean }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      storefront_rate_hit: {
+        Args: { p_key_id: string; p_limit: number; p_window_seconds: number }
+        Returns: {
+          allowed: boolean
+          remaining: number
+          reset_at: string
+        }[]
+      }
       storefront_search: {
         Args: { lim?: number; q: string }
         Returns: {
