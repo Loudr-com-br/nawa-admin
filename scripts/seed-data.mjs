@@ -184,19 +184,58 @@ await insert("collection_members", [
 ]);
 
 // ── Pacientes ──
-const names = [
+// Âncoras nomeados (estáveis entre execuções — o painel de teste linka o de
+// mais pedidos via seed-patient-auth). Depois deles, geramos uma base maior
+// combinando pools de nomes, para dar densidade às listas/dashboard do admin.
+const anchorNames = [
   "Marina Alves", "Rafael Monteiro", "Camila Duarte", "Bruno Carvalho", "Helena Prado",
   "Otávio Ramires", "Letícia Nunes", "Diego Fontes", "Isabela Rocha", "Thiago Barbosa",
   "Fernanda Lima", "Gustavo Pereira", "Patrícia Souza", "André Martins", "Juliana Castro", "Ricardo Almeida",
 ];
+const firstNames = [
+  "Ana", "Pedro", "Beatriz", "Lucas", "Mariana", "Felipe", "Larissa", "Rodrigo",
+  "Carolina", "Vinícius", "Aline", "Mateus", "Sofia", "Daniel", "Renata", "Eduardo",
+  "Bianca", "Leonardo", "Natália", "Fábio", "Priscila", "Henrique", "Tatiane", "Marcelo",
+  "Vanessa", "Caio", "Débora", "Rafaela", "Gabriel", "Amanda", "Rogério", "Simone",
+];
+const surnames = [
+  "Silva", "Santos", "Oliveira", "Souza", "Rodrigues", "Ferreira", "Costa", "Gomes",
+  "Ribeiro", "Carvalho", "Teixeira", "Moreira", "Cardoso", "Nascimento", "Araújo",
+  "Mendes", "Barros", "Freitas", "Pinto", "Cavalcanti", "Dias", "Correia", "Azevedo", "Rocha",
+];
+const EXTRA_PATIENTS = 64;
+const generatedNames = Array.from({ length: EXTRA_PATIENTS }, (_, i) => {
+  const fn = firstNames[(i * 3) % firstNames.length];
+  const sn1 = surnames[(i * 7 + 1) % surnames.length];
+  const sn2 = surnames[(i * 13 + 5) % surnames.length];
+  return sn1 === sn2 ? `${fn} ${sn1}` : `${fn} ${sn1} ${sn2}`;
+});
+const names = [...anchorNames, ...generatedNames];
+
+// Cadastros espalhados entre 1/abr e 20/jul de 2026 (determinístico por índice).
+const SIGNUP_START = Date.UTC(2026, 3, 1, 9, 0);
+const SIGNUP_SPAN = Date.UTC(2026, 6, 20, 18, 0) - SIGNUP_START;
+const usedEmails = new Set();
 const patientRows = names.map((name, i) => {
-  const slug = name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, ".");
+  let slug = name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, ".");
+  if (usedEmails.has(slug)) slug = `${slug}.${i}`; // garante email único
+  usedEmails.add(slug);
+  const createdAt = new Date(
+    SIGNUP_START + Math.floor((i / Math.max(1, names.length - 1)) * SIGNUP_SPAN) + (i * 53 % 11) * 3600000
+  ).toISOString();
+  // Maioria com consentimento; alguns pendentes/revogados para exercitar filtros.
+  const consent_status = i % 11 === 0 ? "pending" : i % 29 === 0 ? "revoked" : "granted";
+  // Perfil clínico leve em parte da base (o suficiente p/ telas, não é dado real).
+  const clinical_profile = i % 3 === 0
+    ? { age: 28 + (i % 30), weight_kg: 62 + (i % 45), height_cm: 158 + (i % 28), goal: ["emagrecimento", "energia", "metabolismo"][i % 3] }
+    : {};
   return {
     name,
     email: `${slug}@email.com`,
     phone: `+55 11 9${String(80000000 + i * 137).slice(0, 8)}`,
-    consent_status: "granted",
-    clinical_profile: {},
+    consent_status,
+    clinical_profile,
+    created_at: createdAt,
   };
 });
 const patients = await insert("patients", patientRows);
@@ -226,7 +265,8 @@ patients.forEach((pt, i) => {
   const payment = paymentFor(status, i);
   const isPlus = i % 2 === 0;
   const plan = isPlus ? planBy["Plus"] : planBy["Start"];
-  const createdAt = new Date(Date.UTC(2026, 5, Math.max(1, 28 - i), 12, 0)).toISOString();
+  // pedido feito alguns dias após o cadastro do paciente
+  const createdAt = new Date(new Date(pt.created_at).getTime() + (2 + (i % 6)) * 86400000).toISOString();
 
   const items = [
     { ref_type: "plan", name: `Plano ${plan.name} — mensal`, quantity: 1, unit_price: Number(plan.base_price) },

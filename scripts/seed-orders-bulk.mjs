@@ -11,9 +11,9 @@ const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !key) { console.error("Faltam variáveis do Supabase"); process.exit(1); }
 const db = createClient(url, key, { auth: { persistSession: false } });
 
-const N = Number(process.argv[2] ?? 180);
-const DAYS = 60;
-const NOW = new Date("2026-07-03T18:00:00-03:00");
+const N = Number(process.argv[2] ?? 600);
+const DAYS = 90;
+const NOW = new Date("2026-08-05T18:00:00-03:00");
 
 const { data: patients } = await db.from("patients").select("id");
 const { data: plans } = await db.from("plans").select("id, name, base_price");
@@ -109,4 +109,4 @@ for (let i = 0; i < allEvents.length; i += 200) {
   if (error) { console.error(error.message); process.exit(1); }
 }
 
-console.log(`✓ ${inserted.length} pedidos, ${allItems.length} itens, ${allEvents.length} eventos (60 dias).`);
+console.log(`✓ ${inserted.length} pedidos, ${allItems.length} itens, ${allEvents.length} eventos (${DAYS} dias).`);
