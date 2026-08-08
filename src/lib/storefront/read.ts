@@ -129,44 +129,44 @@ export async function getPublishedProtocols() {
 export async function getPublishedCollections() {
   const supabase = createAdminClient();
 
-  const { data: cols } = await supabase
-    .from("collections")
-    .select("id, slug, name, description, parent_id, image_url")
-    .eq("status", "published")
-    .eq("visibility", "public")
-    .order("order");
-  const publicCols = cols ?? [];
+  // UMA onda de round-trips (nada depende de nada): coleções com os membros
+  // embutidos + todos os itens/protocolos publicados-públicos p/ resolver os refs
+  // em memória. Antes eram 3 ondas encadeadas (cols → members → items/protos), o
+  // gargalo de latência do rollup — api-boundary §3.2. O catálogo é pequeno, então
+  // trazer as listas publicadas inteiras é mais barato que 2 round-trips extras.
+  const [colsRes, itemsRes, protosRes] = await Promise.all([
+    supabase
+      .from("collections")
+      .select("id, slug, name, description, parent_id, order, image_url, collection_members(ref_type, ref_id, order)")
+      .eq("status", "published")
+      .eq("visibility", "public")
+      .order("order"),
+    supabase.from("items").select("id, slug, name, image_url").eq("status", "published").eq("visibility", "public"),
+    supabase.from("protocols").select("id, slug, name, image_url").eq("status", "published").eq("visibility", "public"),
+  ]);
+
+  const publicCols = (colsRes.data ?? []) as any[];
   const publicIds = new Set(publicCols.map((c: any) => c.id));
 
-  // Membros de todas as coleções públicas (own + base do rollup).
-  const { data: rows } = await supabase
-    .from("collection_members")
-    .select("collection_id, ref_type, ref_id, order")
-    .in("collection_id", publicCols.map((c: any) => c.id).length ? publicCols.map((c: any) => c.id) : ["00000000-0000-0000-0000-000000000000"]);
-  const memberRows = rows ?? [];
-
-  // Resolve refs para slug/nome, filtrando published + public.
-  const itemIds = memberRows.filter((m: any) => m.ref_type === "item").map((m: any) => m.ref_id);
-  const protoIds = memberRows.filter((m: any) => m.ref_type === "protocol").map((m: any) => m.ref_id);
-  const [items, protos] = await Promise.all([
-    itemIds.length ? supabase.from("items").select("id, slug, name, status, visibility, image_url").in("id", itemIds) : Promise.resolve({ data: [] }),
-    protoIds.length ? supabase.from("protocols").select("id, slug, name, status, visibility, image_url").in("id", protoIds) : Promise.resolve({ data: [] }),
-  ]);
+  // Índice ref → slug/nome/imagem. Como só trazemos published+public, estar no
+  // índice já É o filtro fail-closed (medical_only/rascunho nunca entra).
   const pub = new Map<string, { slug: string; name: string; refType: string; imageUrl: string }>();
-  for (const i of (items as any).data ?? []) {
-    if (i.status === "published" && i.visibility === "public") pub.set(`item:${i.id}`, { slug: i.slug, name: i.name, refType: "item", imageUrl: i.image_url ?? "" });
+  for (const i of (itemsRes.data ?? []) as any[]) {
+    pub.set(`item:${i.id}`, { slug: i.slug, name: i.name, refType: "item", imageUrl: i.image_url ?? "" });
   }
-  for (const p of (protos as any).data ?? []) {
-    if (p.status === "published" && p.visibility === "public") pub.set(`protocol:${p.id}`, { slug: p.slug, name: p.name, refType: "protocol", imageUrl: p.image_url ?? "" });
+  for (const p of (protosRes.data ?? []) as any[]) {
+    pub.set(`protocol:${p.id}`, { slug: p.slug, name: p.name, refType: "protocol", imageUrl: p.image_url ?? "" });
   }
 
-  // Membros filtrados por coleção.
+  // Membros filtrados por coleção (a partir dos embutidos).
   const membersByCol = new Map<string, any[]>();
-  for (const m of memberRows) {
-    const resolved = pub.get(`${m.ref_type}:${m.ref_id}`);
-    if (!resolved) continue; // medical_only / não-publicado nunca entra
-    if (!membersByCol.has(m.collection_id)) membersByCol.set(m.collection_id, []);
-    membersByCol.get(m.collection_id)!.push({ ...resolved, order: m.order ?? 0 });
+  for (const c of publicCols) {
+    for (const m of (c.collection_members ?? []) as any[]) {
+      const resolved = pub.get(`${m.ref_type}:${m.ref_id}`);
+      if (!resolved) continue; // medical_only / não-publicado nunca entra
+      if (!membersByCol.has(c.id)) membersByCol.set(c.id, []);
+      membersByCol.get(c.id)!.push({ ...resolved, order: m.order ?? 0 });
+    }
   }
 
   // Descendentes (só coleções públicas) para o rollup.
