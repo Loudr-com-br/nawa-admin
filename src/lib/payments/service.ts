@@ -61,7 +61,7 @@ export async function payOrder(
 
   const { data: patient } = await sb
     .from("patients")
-    .select("name, email, phone")
+    .select("name, email, phone, cpf")
     .eq("id", patientId)
     .single();
 
@@ -81,8 +81,9 @@ export async function payOrder(
         patientId,
         name: patient?.name ?? "",
         email: patient?.email ?? "",
-        document: opts.document,
-        // O cadastro manda; o checkout serve de rede se o paciente não tiver telefone.
+        // O que veio na requisição tem precedência (o pagador pode ser outro, e o
+        // titular do cartão é quem o provedor valida); o cadastro é a rede.
+        document: opts.document ?? patient?.cpf ?? undefined,
         phone: patient?.phone ?? opts.phone,
       },
       paymentToken: opts.paymentToken,

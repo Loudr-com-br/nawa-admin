@@ -659,6 +659,7 @@ export type Database = {
           auth_user_id: string | null
           clinical_profile: Json
           consent_status: string
+          cpf: string | null
           created_at: string
           email: string
           id: string
@@ -670,6 +671,7 @@ export type Database = {
           auth_user_id?: string | null
           clinical_profile?: Json
           consent_status?: string
+          cpf?: string | null
           created_at?: string
           email: string
           id?: string
@@ -681,6 +683,7 @@ export type Database = {
           auth_user_id?: string | null
           clinical_profile?: Json
           consent_status?: string
+          cpf?: string | null
           created_at?: string
           email?: string
           id?: string

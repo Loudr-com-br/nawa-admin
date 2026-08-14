@@ -15,7 +15,13 @@ export async function POST(request: Request) {
 
   // `shippingOptionId` é a MODALIDADE escolhida, não o preço — a tarifa é
   // resolvida no servidor (spec §9).
-  let body: { cartHash?: string; name?: string; shippingOptionId?: string } | null = null;
+  let body: {
+    cartHash?: string;
+    name?: string;
+    shippingOptionId?: string;
+    cpf?: string;
+    phone?: string;
+  } | null = null;
   try {
     body = await request.json();
   } catch {
@@ -23,7 +29,9 @@ export async function POST(request: Request) {
   }
   if (!body?.cartHash) return json({ error: "cartHash é obrigatório" }, 400);
 
-  const patientId = await resolveOrCreatePatient(user, body.name);
+  // CPF e telefone vêm do bloco "Dados pessoais" e ficam no cadastro — assim o
+  // paciente que volta para pagar um pedido pendente não precisa redigitar.
+  const patientId = await resolveOrCreatePatient(user, body.name, body.cpf, body.phone);
   const result = await createOrderFromCart(patientId, body.cartHash, body.shippingOptionId);
   if ("error" in result) return json(result, 400);
   return json(result);

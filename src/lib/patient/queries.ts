@@ -55,7 +55,7 @@ export async function getPatientProfile(patientId: string) {
   const sb = createAdminClient();
   const { data } = await sb
     .from("patients")
-    .select("name, email, phone")
+    .select("name, email, phone, cpf")
     .eq("id", patientId)
     .single();
   return { name: data?.name ?? "", email: data?.email ?? "", phone: data?.phone ?? "" };

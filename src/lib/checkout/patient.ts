@@ -7,15 +7,34 @@ import type { AuthUser } from "@/lib/patient/auth";
 // criamos a linha em `patients` vinculada ao auth_user_id. Se já existe, reusa.
 // É aqui que o convidado vira paciente de verdade (substitui o seed).
 
-export async function resolveOrCreatePatient(user: AuthUser, name?: string): Promise<string> {
+export async function resolveOrCreatePatient(
+  user: AuthUser,
+  name?: string,
+  cpf?: string,
+  phone?: string,
+): Promise<string> {
   const sb: any = createAdminClient();
+  const digits = (v?: string) => {
+    const d = v?.replace(/\D/g, "");
+    return d && d.length > 0 ? d : undefined;
+  };
+  const cpfDigits = digits(cpf);
+  const phoneDigits = digits(phone);
 
   const { data: existing } = await sb
     .from("patients")
-    .select("id")
+    .select("id, cpf, phone")
     .eq("auth_user_id", user.authUserId)
     .maybeSingle();
-  if (existing) return existing.id;
+  if (existing) {
+    // Completa o cadastro sem sobrescrever o que já existe — quem já tem CPF no
+    // cadastro não deve ter o dado trocado por um digitado num checkout posterior.
+    const patch: Record<string, string> = {};
+    if (cpfDigits && !existing.cpf) patch.cpf = cpfDigits;
+    if (phoneDigits && !existing.phone) patch.phone = phoneDigits;
+    if (Object.keys(patch).length) await sb.from("patients").update(patch).eq("id", existing.id);
+    return existing.id;
+  }
 
   // fallback de nome: o informado, ou o começo do email
   const fallbackName = (name?.trim() || user.email.split("@")[0] || "Paciente").slice(0, 120);
@@ -27,6 +46,8 @@ export async function resolveOrCreatePatient(user: AuthUser, name?: string): Pro
       name: fallbackName,
       email: user.email,
       consent_status: "granted", // consentiu ao criar a conta no checkout
+      ...(cpfDigits ? { cpf: cpfDigits } : {}),
+      ...(phoneDigits ? { phone: phoneDigits } : {}),
     })
     .select("id")
     .single();
