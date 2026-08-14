@@ -13,7 +13,9 @@ export async function POST(request: Request) {
   const user = await authenticateAuthUser(request);
   if (!user) return json({ error: "unauthorized" }, 401);
 
-  let body: { cartHash?: string; name?: string } | null = null;
+  // `shippingOptionId` é a MODALIDADE escolhida, não o preço — a tarifa é
+  // resolvida no servidor (spec §9).
+  let body: { cartHash?: string; name?: string; shippingOptionId?: string } | null = null;
   try {
     body = await request.json();
   } catch {
@@ -22,7 +24,7 @@ export async function POST(request: Request) {
   if (!body?.cartHash) return json({ error: "cartHash é obrigatório" }, 400);
 
   const patientId = await resolveOrCreatePatient(user, body.name);
-  const result = await createOrderFromCart(patientId, body.cartHash);
+  const result = await createOrderFromCart(patientId, body.cartHash, body.shippingOptionId);
   if ("error" in result) return json(result, 400);
   return json(result);
 }

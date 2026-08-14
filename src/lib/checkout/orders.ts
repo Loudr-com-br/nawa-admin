@@ -1,6 +1,7 @@
 import "server-only";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from "@/lib/supabase/admin";
+import { resolveShipping } from "./shipping";
 //
 // Fechamento do pedido (spec §6.2). O front envia o hash do carrinho; o
 // backoffice REVALIDA (item ainda publicado + público?), RECALCULA o preço
@@ -11,10 +12,21 @@ import { createAdminClient } from "@/lib/supabase/admin";
 const REF_TYPE_MAP: Record<string, string> = { protocol: "plan", item: "product" };
 
 export type CheckoutResult =
-  | { orderId: string; number: string; total: number; status: string }
+  | {
+      orderId: string;
+      number: string;
+      total: number;
+      subtotal: number;
+      shipping: number;
+      status: string;
+    }
   | { error: string; detail?: string };
 
-export async function createOrderFromCart(patientId: string, cartHash: string): Promise<CheckoutResult> {
+export async function createOrderFromCart(
+  patientId: string,
+  cartHash: string,
+  shippingOptionId?: string,
+): Promise<CheckoutResult> {
   const sb: any = createAdminClient();
 
   const { data: cart } = await sb.from("carts").select("id, status").eq("hash", cartHash).maybeSingle();
@@ -27,7 +39,13 @@ export async function createOrderFromCart(patientId: string, cartHash: string): 
     .eq("cart_id", cart.id);
   if (!lines?.length) return { error: "cart_empty" };
 
-  // Revalida cada linha contra o catálogo publicado e recalcula o total.
+  // O front escolhe a MODALIDADE; o preço sai da tabela daqui. Um ID desconhecido
+  // recusa o pedido em vez de cair em zero silenciosamente.
+  const shipping = resolveShipping(shippingOptionId);
+  if (shippingOptionId && !shipping) return { error: "shipping_option_unknown", detail: shippingOptionId };
+  const shippingTotal = shipping?.price ?? 0;
+
+  // Revalida cada linha contra o catálogo publicado e recalcula o subtotal.
   let total = 0;
   const orderItems: any[] = [];
   for (const l of lines) {
@@ -51,10 +69,20 @@ export async function createOrderFromCart(patientId: string, cartHash: string): 
     });
   }
 
-  // Cria o pedido (aguardando pagamento) e suas linhas.
+  // Cria o pedido (aguardando pagamento) e suas linhas. `total` já inclui o frete
+  // — é o valor que vai ao provedor de pagamento e o que o paciente vê no painel.
+  const subtotal = total;
+  total += shippingTotal;
+
   const { data: order, error: orderErr } = await sb
     .from("orders")
-    .insert({ patient_id: patientId, total, status: "awaiting_payment", payment_status: "pending" })
+    .insert({
+      patient_id: patientId,
+      total,
+      shipping_total: shippingTotal,
+      status: "awaiting_payment",
+      payment_status: "pending",
+    })
     .select("id")
     .single();
   if (orderErr || !order) return { error: `order_create_failed: ${orderErr?.message ?? "?"}` };
@@ -68,6 +96,8 @@ export async function createOrderFromCart(patientId: string, cartHash: string): 
     orderId: order.id,
     number: `#NAWA-${String(order.id).slice(0, 4).toUpperCase()}`,
     total,
+    subtotal,
+    shipping: shippingTotal,
     status: "awaiting_payment",
   };
 }

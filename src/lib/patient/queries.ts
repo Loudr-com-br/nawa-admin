@@ -11,7 +11,7 @@ export async function getPatientOrders(patientId: string) {
   const sb = createAdminClient();
   const { data } = await sb
     .from("orders")
-    .select("id, status, payment_status, total, created_at, order_items(name, quantity, unit_price)")
+    .select("id, status, payment_status, total, shipping_total, created_at, order_items(name, quantity, unit_price)")
     .eq("patient_id", patientId)
     .order("created_at", { ascending: false });
 
@@ -21,7 +21,8 @@ export async function getPatientOrders(patientId: string) {
       number: `#NAWA-${String(o.id).slice(0, 4).toUpperCase()}`,
       status: o.status, // enum cru — o front traduz (§8)
       paymentStatus: o.payment_status,
-      total: Number(o.total),
+      total: Number(o.total), // já inclui o frete
+      shipping: Number(o.shipping_total ?? 0),
       createdAt: o.created_at,
       items: (o.order_items ?? []).map((i: any) => ({
         name: i.name,
