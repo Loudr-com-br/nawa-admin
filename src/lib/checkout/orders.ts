@@ -2,6 +2,7 @@ import "server-only";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveShipping } from "./shipping";
+import { getAddressForOrder } from "@/lib/patient/addresses";
 //
 // Fechamento do pedido (spec §6.2). O front envia o hash do carrinho; o
 // backoffice REVALIDA (item ainda publicado + público?), RECALCULA o preço
@@ -26,6 +27,7 @@ export async function createOrderFromCart(
   patientId: string,
   cartHash: string,
   shippingOptionId?: string,
+  addressId?: string,
 ): Promise<CheckoutResult> {
   const sb: any = createAdminClient();
 
@@ -44,6 +46,13 @@ export async function createOrderFromCart(
   const shipping = resolveShipping(shippingOptionId);
   if (shippingOptionId && !shipping) return { error: "shipping_option_unknown", detail: shippingOptionId };
   const shippingTotal = shipping?.price ?? 0;
+
+  // SNAPSHOT do endereço, não a chave: se o paciente editar ou apagar da agenda
+  // depois, o pedido tem que continuar dizendo para onde foi.
+  const address = await getAddressForOrder(patientId, addressId);
+  const addressSnapshot = address
+    ? { ...address, shippingOptionId: shipping?.id ?? null, shippingLabel: shipping?.label ?? null }
+    : null;
 
   // Revalida cada linha contra o catálogo publicado e recalcula o subtotal.
   let total = 0;
@@ -80,6 +89,7 @@ export async function createOrderFromCart(
       patient_id: patientId,
       total,
       shipping_total: shippingTotal,
+      shipping_address: addressSnapshot,
       status: "awaiting_payment",
       payment_status: "pending",
     })

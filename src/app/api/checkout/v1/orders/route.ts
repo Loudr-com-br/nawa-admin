@@ -21,6 +21,7 @@ export async function POST(request: Request) {
     shippingOptionId?: string;
     cpf?: string;
     phone?: string;
+    addressId?: string;
   } | null = null;
   try {
     body = await request.json();
@@ -32,7 +33,12 @@ export async function POST(request: Request) {
   // CPF e telefone vêm do bloco "Dados pessoais" e ficam no cadastro — assim o
   // paciente que volta para pagar um pedido pendente não precisa redigitar.
   const patientId = await resolveOrCreatePatient(user, body.name, body.cpf, body.phone);
-  const result = await createOrderFromCart(patientId, body.cartHash, body.shippingOptionId);
+  const result = await createOrderFromCart(
+    patientId,
+    body.cartHash,
+    body.shippingOptionId,
+    body.addressId,
+  );
   if ("error" in result) return json(result, 400);
   return json(result);
 }

@@ -606,6 +606,7 @@ export type Database = {
           payment_status: Database["public"]["Enums"]["payment_status"]
           plan_id: string | null
           prescription_id: string | null
+          shipping_address: Json | null
           shipping_total: number
           status: Database["public"]["Enums"]["order_status"]
           total: number
@@ -619,6 +620,7 @@ export type Database = {
           payment_status?: Database["public"]["Enums"]["payment_status"]
           plan_id?: string | null
           prescription_id?: string | null
+          shipping_address?: Json | null
           shipping_total?: number
           status?: Database["public"]["Enums"]["order_status"]
           total?: number
@@ -632,6 +634,7 @@ export type Database = {
           payment_status?: Database["public"]["Enums"]["payment_status"]
           plan_id?: string | null
           prescription_id?: string | null
+          shipping_address?: Json | null
           shipping_total?: number
           status?: Database["public"]["Enums"]["order_status"]
           total?: number
@@ -650,6 +653,62 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      patient_addresses: {
+        Row: {
+          bairro: string | null
+          cep: string
+          cidade: string
+          complemento: string | null
+          created_at: string
+          id: string
+          is_default: boolean
+          label: string | null
+          logradouro: string
+          numero: string
+          patient_id: string
+          uf: string
+          updated_at: string
+        }
+        Insert: {
+          bairro?: string | null
+          cep: string
+          cidade: string
+          complemento?: string | null
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          label?: string | null
+          logradouro: string
+          numero: string
+          patient_id: string
+          uf: string
+          updated_at?: string
+        }
+        Update: {
+          bairro?: string | null
+          cep?: string
+          cidade?: string
+          complemento?: string | null
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          label?: string | null
+          logradouro?: string
+          numero?: string
+          patient_id?: string
+          uf?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_addresses_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
             referencedColumns: ["id"]
           },
         ]
