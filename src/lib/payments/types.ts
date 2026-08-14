@@ -21,6 +21,8 @@ export interface PaymentCustomer {
    * ainda não tem coluna de CPF — ver tarefa de persistência.
    */
   document?: string;
+  /** Telefone com DDD. O Pagar.me RECUSA a cobrança sem pelo menos um telefone. */
+  phone?: string;
 }
 
 // Como a cobrança no cartão é aberta. `auth_and_capture` cobra na hora;
@@ -28,6 +30,15 @@ export interface PaymentCustomer {
 // pré-compra discutido com o cliente (bloquear o valor e só transacionar após a
 // validação clínica do protocolo). Escolhido por env, não por código de chamada.
 export type PaymentOperation = "auth_and_capture" | "auth_only";
+
+/** Endereço de cobrança. O Pagar.me RECUSA cobrança no cartão sem ele. */
+export interface BillingAddress {
+  line1: string; // "Rua Ourique, 120 — Penha Circular"
+  zipCode: string; // só dígitos
+  city: string;
+  state: string; // UF
+  country?: string; // ISO-2, default BR
+}
 
 export interface CreateIntentInput {
   orderId: string;
@@ -38,6 +49,7 @@ export interface CreateIntentInput {
   /** Token do cartão gerado NO CLIENTE. O PAN nunca chega ao nosso servidor. */
   paymentToken?: string;
   installments?: number;
+  billingAddress?: BillingAddress;
   metadata?: Record<string, unknown>;
 }
 

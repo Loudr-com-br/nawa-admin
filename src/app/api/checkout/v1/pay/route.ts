@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticatePatient } from "@/lib/patient/auth";
 import { payOrder } from "@/lib/payments/service";
-import type { PaymentMethod } from "@/lib/payments/types";
+import type { BillingAddress, PaymentMethod } from "@/lib/payments/types";
 
 // POST /api/checkout/v1/pay — cobra um pedido `awaiting_payment` (spec §6.2).
 // Auth: sessão do paciente (JWT); o escopo do pedido é resolvido no servidor.
@@ -16,6 +16,8 @@ interface PayBody {
   paymentToken?: string;
   installments?: number;
   document?: string;
+  phone?: string;
+  billingAddress?: BillingAddress;
 }
 
 export async function POST(request: Request) {
@@ -34,6 +36,8 @@ export async function POST(request: Request) {
     paymentToken: body.paymentToken,
     installments: body.installments,
     document: body.document,
+    phone: body.phone,
+    billingAddress: body.billingAddress,
   });
   if ("error" in result) {
     const code =

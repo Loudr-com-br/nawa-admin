@@ -2,7 +2,7 @@ import "server-only";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPaymentProvider } from "./provider";
-import type { PaymentMethod, PaymentOutcome } from "./types";
+import type { BillingAddress, PaymentMethod, PaymentOutcome } from "./types";
 
 // Serviço de pagamento (spec §6.2). Liga a porta do provedor ao banco:
 // cria a intent, registra a tentativa em `payments`, aplica o desfecho ao pedido
@@ -26,6 +26,10 @@ export interface PayOptions {
   installments?: number;
   /** CPF do pagador — exigido pelo PIX do Pagar.me. */
   document?: string;
+  /** Telefone informado no checkout — só usado se o paciente não tiver um no cadastro. */
+  phone?: string;
+  /** Endereço de cobrança (vem do bloco Entrega). Obrigatório no cartão. */
+  billingAddress?: BillingAddress;
 }
 
 /**
@@ -57,7 +61,7 @@ export async function payOrder(
 
   const { data: patient } = await sb
     .from("patients")
-    .select("name, email")
+    .select("name, email, phone")
     .eq("id", patientId)
     .single();
 
@@ -78,19 +82,27 @@ export async function payOrder(
         name: patient?.name ?? "",
         email: patient?.email ?? "",
         document: opts.document,
+        // O cadastro manda; o checkout serve de rede se o paciente não tiver telefone.
+        phone: patient?.phone ?? opts.phone,
       },
       paymentToken: opts.paymentToken,
       installments: opts.installments,
+      billingAddress: opts.billingAddress,
     });
   } catch (e) {
     return { error: "payment_provider_error", detail: (e as Error).message };
   }
+  // A linha nasce em `created` mesmo que o provedor já tenha aprovado na abertura
+  // (o Pagar.me, com captura direta, devolve a cobrança paga de imediato). Quem
+  // aplica o desfecho é sempre o applyOutcome — e ele sai cedo se a linha já
+  // estiver num estado terminal. Gravar `paid` aqui faria o guarda de idempotência
+  // engolir a própria confirmação e o pedido nunca sairia de awaiting_payment.
   const { error: payErr } = await sb.from("payments").insert({
     order_id: orderId,
     provider: provider.id,
     provider_ref: intent.providerRef,
     amount: order.total,
-    status: intent.status,
+    status: "created",
     raw: {},
   });
   if (payErr && !/duplicate key/i.test(payErr.message)) {

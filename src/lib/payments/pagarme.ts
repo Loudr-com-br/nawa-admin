@@ -31,8 +31,10 @@ const OPERATION = (process.env.PAGARME_OPERATION ?? "auth_and_capture") as Payme
 const STATEMENT = (process.env.PAGARME_STATEMENT_DESCRIPTOR ?? "NAWA").slice(0, 13);
 
 function secretKey(): string {
-  const key = process.env.PAGARME_SECRET_KEY;
-  if (!key) throw new Error("PAGARME_SECRET_KEY ausente");
+  // `PAGARME_API_KEY` é o nome que o painel do Pagar.me usa; `PAGARME_SECRET_KEY`
+  // fica como alias para não quebrar quem já configurou com o outro nome.
+  const key = process.env.PAGARME_API_KEY ?? process.env.PAGARME_SECRET_KEY;
+  if (!key) throw new Error("PAGARME_API_KEY ausente");
   return key;
 }
 
@@ -49,6 +51,21 @@ function toCents(amount: number): number {
 function onlyDigits(v: string | undefined): string | undefined {
   const d = v?.replace(/\D/g, "");
   return d && d.length > 0 ? d : undefined;
+}
+
+/**
+ * Telefone brasileiro → formato do Pagar.me. Eles RECUSAM a cobrança se o cliente
+ * não tiver ao menos um telefone ("At least one customer phone is required"), então
+ * um número malformado é melhor tratado como ausente do que enviado quebrado.
+ */
+function toPhones(raw: string | undefined): Record<string, unknown> | undefined {
+  let d = onlyDigits(raw);
+  if (!d) return undefined;
+  if (d.length > 11 && d.startsWith("55")) d = d.slice(2); // veio com o código do país
+  if (d.length < 10 || d.length > 11) return undefined; // DDD + 8 ou 9 dígitos
+  return {
+    mobile_phone: { country_code: "55", area_code: d.slice(0, 2), number: d.slice(2) },
+  };
 }
 
 async function call(path: string, init: RequestInit): Promise<any> {
@@ -139,7 +156,9 @@ export const pagarmeProvider: PaymentProvider = {
   async createIntent(input: CreateIntentInput): Promise<PaymentIntent> {
     const amount = toCents(input.amount);
     const document = onlyDigits(input.customer.document);
+    const phones = toPhones(input.customer.phone);
 
+    const b = input.billingAddress;
     const payment: Record<string, unknown> =
       input.method === "credit_card"
         ? {
@@ -149,14 +168,31 @@ export const pagarmeProvider: PaymentProvider = {
               installments: input.installments ?? 1,
               operation_type: OPERATION,
               statement_descriptor: STATEMENT,
+              // O billing address NÃO é tokenizado — precisa vir junto do pedido,
+              // aninhado em `card` mesmo quando se paga por token. Sem ele o
+              // gateway recusa com "validation_error | billing".
+              ...(b
+                ? {
+                    card: {
+                      billing_address: {
+                        line_1: b.line1,
+                        zip_code: onlyDigits(b.zipCode) ?? b.zipCode,
+                        city: b.city,
+                        state: b.state,
+                        country: b.country ?? "BR",
+                      },
+                    },
+                  }
+                : {}),
             },
           }
         : input.method === "boleto"
           ? { payment_method: "boleto", boleto: { instructions: "Pagar até o vencimento." } }
           : { payment_method: "pix", pix: { expires_in: 3600 } };
 
-    if (input.method === "credit_card" && !input.paymentToken) {
-      throw new Error("pagarme: card_token obrigatório para credit_card");
+    if (input.method === "credit_card") {
+      if (!input.paymentToken) throw new Error("pagarme: card_token obrigatório para credit_card");
+      if (!b) throw new Error("pagarme: endereço de cobrança obrigatório para credit_card");
     }
 
     const order = await call("/orders", {
@@ -170,6 +206,7 @@ export const pagarmeProvider: PaymentProvider = {
           email: input.customer.email,
           type: "individual",
           ...(document ? { document, document_type: "CPF" } : {}),
+          ...(phones ? { phones } : {}),
         },
         items: [
           {
