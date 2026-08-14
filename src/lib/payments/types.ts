@@ -7,13 +7,27 @@ export type PaymentProviderId = "stub" | "pagarme";
 export type PaymentMethod = "pix" | "credit_card" | "boleto";
 
 // Espelha o enum payment_txn_status da migration.
+// `processing` cobre tanto "aguardando o cliente" (PIX não pago) quanto
+// "autorizado, aguardando captura" (pré-compra) — o detalhe fica no `raw`.
 export type PaymentTxnStatus = "created" | "processing" | "paid" | "failed" | "refunded";
 
 export interface PaymentCustomer {
   patientId: string;
   name: string;
   email: string;
+  /**
+   * CPF (só dígitos). O PIX do Pagar.me exige documento do pagador. Hoje vem na
+   * requisição (o bloco "Dados pessoais" do checkout coleta) porque `patients`
+   * ainda não tem coluna de CPF — ver tarefa de persistência.
+   */
+  document?: string;
 }
+
+// Como a cobrança no cartão é aberta. `auth_and_capture` cobra na hora;
+// `auth_only` apenas RESERVA o limite e exige um capture posterior — é o modelo de
+// pré-compra discutido com o cliente (bloquear o valor e só transacionar após a
+// validação clínica do protocolo). Escolhido por env, não por código de chamada.
+export type PaymentOperation = "auth_and_capture" | "auth_only";
 
 export interface CreateIntentInput {
   orderId: string;
@@ -21,6 +35,9 @@ export interface CreateIntentInput {
   currency: "BRL";
   method: PaymentMethod;
   customer: PaymentCustomer;
+  /** Token do cartão gerado NO CLIENTE. O PAN nunca chega ao nosso servidor. */
+  paymentToken?: string;
+  installments?: number;
   metadata?: Record<string, unknown>;
 }
 
@@ -35,6 +52,12 @@ export interface PaymentIntent {
 export interface ConfirmInput {
   providerRef: string;
   paymentToken?: string; // devolvido pelo cliente após tokenizar (opcional no stub)
+}
+
+export interface CaptureInput {
+  providerRef: string;
+  /** Captura parcial, em reais. Omitido = captura o valor autorizado inteiro. */
+  amount?: number;
 }
 
 // Desfecho normalizado — mesma forma para o confirm síncrono e para o webhook.
@@ -52,4 +75,9 @@ export interface PaymentProvider {
   confirm(input: ConfirmInput): Promise<PaymentOutcome>;
   /** Verifica a assinatura e normaliza o payload cru do webhook. Lança se inválida. */
   parseWebhook(rawBody: string, signature: string | null): PaymentOutcome;
+  /**
+   * Captura uma cobrança autorizada (só existe no fluxo `auth_only`). Opcional: um
+   * provedor que sempre captura na autorização não precisa implementar.
+   */
+  capture?(input: CaptureInput): Promise<PaymentOutcome>;
 }

@@ -1,10 +1,10 @@
 import "server-only";
+import { pagarmeProvider } from "./pagarme";
 import { stubProvider } from "./stub";
 import type { PaymentProvider, PaymentProviderId } from "./types";
 
 // Seleção do provedor por ambiente. Default: stub (sem chaves, sem rede).
-// Quando as credenciais Pagar.me chegarem, criar `pagarme.ts` implementando a
-// mesma porta e ligar aqui — nada mais no checkout muda.
+// `PAYMENT_PROVIDER=pagarme` liga o adapter real — nada no checkout muda.
 const CONFIGURED = (process.env.PAYMENT_PROVIDER ?? "stub") as PaymentProviderId;
 
 export function getPaymentProvider(): PaymentProvider {
@@ -12,7 +12,7 @@ export function getPaymentProvider(): PaymentProvider {
     case "stub":
       return stubProvider;
     case "pagarme":
-      throw new Error("payment provider 'pagarme' ainda não configurado (faltam chaves/SDK)");
+      return pagarmeProvider;
     default:
       throw new Error(`payment provider desconhecido: ${CONFIGURED}`);
   }

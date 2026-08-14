@@ -1,4 +1,3 @@
-// Alias retrocompatível — a implementação vive em /v1 (versionamento da
-// fronteira, api-boundary §3.4). Rotas sem versão seguem funcionando p/ o
-// que já está em produção; o novo é servido pela versão /v1.
+// Alias sem versão de /api/checkout/v1/pay — mantido para não quebrar clientes
+// antigos. A implementação vive na rota versionada; aqui só reexportamos.
 export { POST } from "../v1/pay/route";

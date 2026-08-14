@@ -9,8 +9,24 @@ import type { PaymentMethod, PaymentOutcome } from "./types";
 // (awaiting_payment → paid) e grava o evento na linha do tempo. Tudo idempotente.
 
 export type PayResult =
-  | { orderId: string; status: string; paymentStatus: string; providerRef: string }
+  | {
+      orderId: string;
+      status: string;
+      paymentStatus: string;
+      providerRef: string;
+      /** PIX: copia-e-cola p/ o cliente concluir. Vazio no cartão (já resolvido). */
+      clientToken?: string;
+    }
   | { error: string; detail?: string };
+
+/** Dados que só o cliente tem na hora de pagar — não persistidos no pedido. */
+export interface PayOptions {
+  /** Token do cartão gerado no navegador (o PAN nunca chega aqui). */
+  paymentToken?: string;
+  installments?: number;
+  /** CPF do pagador — exigido pelo PIX do Pagar.me. */
+  document?: string;
+}
 
 /**
  * Inicia (e, no stub síncrono, confirma na hora) o pagamento de um pedido
@@ -21,6 +37,7 @@ export async function payOrder(
   patientId: string,
   orderId: string,
   method: PaymentMethod = "pix",
+  opts: PayOptions = {},
 ): Promise<PayResult> {
   const sb: any = createAdminClient();
 
@@ -46,14 +63,28 @@ export async function payOrder(
 
   const provider = getPaymentProvider();
 
-  // 1) abre a cobrança no provedor e registra a tentativa.
-  const intent = await provider.createIntent({
-    orderId,
-    amount: Number(order.total),
-    currency: "BRL",
-    method,
-    customer: { patientId, name: patient?.name ?? "", email: patient?.email ?? "" },
-  });
+  // 1) abre a cobrança no provedor e registra a tentativa. Uma falha aqui é do
+  //    provedor (chave inválida, cartão recusado na autorização, rede) — devolve
+  //    erro sem sujar o pedido, que segue `awaiting_payment` e pode ser retentado.
+  let intent;
+  try {
+    intent = await provider.createIntent({
+      orderId,
+      amount: Number(order.total),
+      currency: "BRL",
+      method,
+      customer: {
+        patientId,
+        name: patient?.name ?? "",
+        email: patient?.email ?? "",
+        document: opts.document,
+      },
+      paymentToken: opts.paymentToken,
+      installments: opts.installments,
+    });
+  } catch (e) {
+    return { error: "payment_provider_error", detail: (e as Error).message };
+  }
   const { error: payErr } = await sb.from("payments").insert({
     order_id: orderId,
     provider: provider.id,
@@ -66,8 +97,9 @@ export async function payOrder(
     return { error: "payment_create_failed", detail: payErr.message };
   }
 
-  // 2) confirma. No stub o desfecho é síncrono; no Pagar.me o real chega por
-  //    webhook (mas aplicar aqui e no webhook é seguro — applyOutcome é idempotente).
+  // 2) confirma. No stub o desfecho é síncrono; no Pagar.me isso relê a cobrança
+  //    (o desfecho real do PIX chega por webhook — aplicar nos dois é seguro,
+  //    applyOutcome é idempotente).
   const outcome = await provider.confirm({ providerRef: intent.providerRef });
   await applyOutcome(sb, outcome);
 
@@ -81,6 +113,7 @@ export async function payOrder(
     status: fresh?.status ?? order.status,
     paymentStatus: fresh?.payment_status ?? order.payment_status,
     providerRef: intent.providerRef,
+    clientToken: intent.clientToken || undefined,
   };
 }
 
