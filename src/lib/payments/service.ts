@@ -2,6 +2,7 @@ import "server-only";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPaymentProvider } from "./provider";
+import { enterClinicalReview } from "@/lib/orders/clinical-review";
 import type { BillingAddress, PaymentMethod, PaymentOutcome } from "./types";
 
 // Serviço de pagamento (spec §6.2). Liga a porta do provedor ao banco:
@@ -163,6 +164,10 @@ export async function applyOutcome(sb: any, evt: PaymentOutcome): Promise<{ ok: 
         label: "Pagamento aprovado",
         description: "Confirmado pelo provedor de pagamento.",
       });
+      // Pagar não libera produção: o pedido entra na fila clínica (spec §7). É o
+      // que prometemos ao paciente na confirmação, e o que sustenta a posição de
+      // plataforma agregadora — a responsabilidade clínica é de quem revisa.
+      await enterClinicalReview(sb, payment.order_id);
     }
   } else if (evt.status === "failed") {
     await sb.from("orders").update({ payment_status: "failed" }).eq("id", payment.order_id);

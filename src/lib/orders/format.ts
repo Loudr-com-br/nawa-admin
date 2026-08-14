@@ -34,10 +34,13 @@ export const orderStatusConfig: Record<
   OrderStatus,
   { label: string; dot: string }
 > = {
+  awaiting_payment: { label: "Aguardando pagamento", dot: "#CBD5E1" },
   paid: { label: "Pago", dot: "#94A3B8" },
+  in_clinical_review: { label: "Revisão clínica", dot: "#6366F1" },
   in_production: { label: "Em produção", dot: "#F59E0B" },
   shipped: { label: "Enviado", dot: "#3B82F6" },
   delivered: { label: "Entregue", dot: "#22C55E" },
+  clinically_rejected: { label: "Reprovado na revisão", dot: "#EF4444" },
   failed: { label: "Falho", dot: "#EF4444" },
 };
 

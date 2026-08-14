@@ -23,6 +23,9 @@ import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
 import ReceiptRoundedIcon from "@mui/icons-material/ReceiptRounded";
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
 import { getOrderById } from "@/lib/orders/queries";
+import { getReview } from "@/lib/orders/clinical-review";
+import { getCurrentUser } from "@/lib/supabase/auth";
+import ClinicalReviewPanel from "./ClinicalReviewPanel";
 import Glp1Tag from "@/components/orders/Glp1Tag";
 import {
   formatBRL,
@@ -45,6 +48,9 @@ export default async function OrderDetailPage({
   const { id } = await params;
   const order = await getOrderById(id);
   if (!order) notFound();
+
+  const [review, currentUser] = await Promise.all([getReview(id), getCurrentUser()]);
+  const canDecide = currentUser?.role === "doctor" || currentUser?.role === "super_admin";
 
   const itemsTotal = order.items.reduce(
     (sum, i) => sum + i.unitPrice * i.quantity,
@@ -170,6 +176,16 @@ export default async function OrderDetailPage({
                   Prescrição não é editável após emissão. Correção gera nova versão (§8.8).
                 </Typography>
               </Stack>
+            </SectionCard>
+
+            {/* Gate clínico — entre o pagamento e a produção (§7) */}
+            <SectionCard title="Revisão clínica" icon={ScienceRoundedIcon}>
+              <ClinicalReviewPanel
+                orderId={order.id}
+                status={order.status}
+                review={review}
+                canDecide={canDecide}
+              />
             </SectionCard>
 
             {/* Histórico */}

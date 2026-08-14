@@ -3,11 +3,18 @@
  * Enquanto o Supabase não é ligado, os dados vêm de mock (ver mock.ts).
  */
 
+// Espelha o enum order_status do banco. Estava incompleto: faltavam
+// `awaiting_payment` (desde 30/07) e os estados do gate clínico, e um status
+// ausente aqui quebra a renderização, porque orderStatusConfig[status] vem
+// undefined.
 export type OrderStatus =
+  | "awaiting_payment"
   | "paid"
+  | "in_clinical_review"
   | "in_production"
   | "shipped"
   | "delivered"
+  | "clinically_rejected"
   | "failed";
 
 export type PaymentStatus = "paid" | "pending" | "failed" | "refunded";

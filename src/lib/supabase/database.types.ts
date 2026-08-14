@@ -299,6 +299,48 @@ export type Database = {
           },
         ]
       }
+      clinical_reviews: {
+        Row: {
+          decision: string
+          id: string
+          notes: string | null
+          order_id: string
+          reviewed_at: string
+          reviewer_id: string | null
+        }
+        Insert: {
+          decision: string
+          id?: string
+          notes?: string | null
+          order_id: string
+          reviewed_at?: string
+          reviewer_id?: string | null
+        }
+        Update: {
+          decision?: string
+          id?: string
+          notes?: string | null
+          order_id?: string
+          reviewed_at?: string
+          reviewer_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinical_reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clinical_reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "users_internal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collection_members: {
         Row: {
           collection_id: string
@@ -1247,10 +1289,12 @@ export type Database = {
       order_status:
         | "awaiting_payment"
         | "paid"
+        | "in_clinical_review"
         | "in_production"
         | "shipped"
         | "delivered"
         | "failed"
+        | "clinically_rejected"
       payment_provider: "stub" | "pagarme"
       payment_status: "paid" | "pending" | "failed" | "refunded"
       payment_txn_status:
@@ -1414,10 +1458,12 @@ export const Constants = {
       order_status: [
         "awaiting_payment",
         "paid",
+        "in_clinical_review",
         "in_production",
         "shipped",
         "delivered",
         "failed",
+        "clinically_rejected",
       ],
       payment_provider: ["stub", "pagarme"],
       payment_status: ["paid", "pending", "failed", "refunded"],
