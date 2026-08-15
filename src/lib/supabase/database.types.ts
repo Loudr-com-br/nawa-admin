@@ -1296,10 +1296,11 @@ export type Database = {
         | "failed"
         | "clinically_rejected"
       payment_provider: "stub" | "pagarme"
-      payment_status: "paid" | "pending" | "failed" | "refunded"
+      payment_status: "paid" | "pending" | "authorized" | "failed" | "refunded"
       payment_txn_status:
         | "created"
         | "processing"
+        | "authorized"
         | "paid"
         | "failed"
         | "refunded"
@@ -1466,10 +1467,11 @@ export const Constants = {
         "clinically_rejected",
       ],
       payment_provider: ["stub", "pagarme"],
-      payment_status: ["paid", "pending", "failed", "refunded"],
+      payment_status: ["paid", "pending", "authorized", "failed", "refunded"],
       payment_txn_status: [
         "created",
         "processing",
+        "authorized",
         "paid",
         "failed",
         "refunded",

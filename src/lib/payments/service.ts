@@ -2,7 +2,6 @@ import "server-only";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPaymentProvider } from "./provider";
-import { enterClinicalReview } from "@/lib/orders/clinical-review";
 import type { BillingAddress, PaymentMethod, PaymentOutcome } from "./types";
 
 // Serviço de pagamento (spec §6.2). Liga a porta do provedor ao banco:
@@ -132,6 +131,31 @@ export async function payOrder(
 }
 
 /**
+ * Coloca o pedido na fila da revisão clínica (spec §7). Mora aqui, no lado do
+ * pagamento, porque é o pagamento que dispara a entrada — e assim o grafo de
+ * imports segue uma direção só: a revisão chama o pagamento, nunca o contrário.
+ *
+ * Guardado por estado: só entra vindo de `awaiting_payment`/`paid`, então webhook
+ * repetido não puxa de volta um pedido já revisado ou já em produção.
+ */
+export async function enterClinicalReview(sb: any, orderId: string): Promise<void> {
+  const { data: updated } = await sb
+    .from("orders")
+    .update({ status: "in_clinical_review" })
+    .eq("id", orderId)
+    .in("status", ["awaiting_payment", "paid"])
+    .select("id");
+
+  if (updated?.length) {
+    await sb.from("order_events").insert({
+      order_id: orderId,
+      label: "Enviado para revisão clínica",
+      description: "O protocolo aguarda validação de um profissional antes da produção.",
+    });
+  }
+}
+
+/**
  * Aplica o desfecho de uma cobrança ao pedido. Reentrante e idempotente — a mesma
  * função serve ao confirm síncrono e ao webhook assíncrono. A transição do pedido
  * é guardada por `.eq("status","awaiting_payment")` para nunca reverter estado.
@@ -150,11 +174,36 @@ export async function applyOutcome(sb: any, evt: PaymentOutcome): Promise<{ ok: 
     .update({ status: evt.status, raw: evt.raw, updated_at: new Date().toISOString() })
     .eq("id", payment.id);
 
+  // Autorizado: o limite do paciente está reservado, mas nada foi capturado. O
+  // pedido segue para a revisão clínica — a captura só acontece se o protocolo for
+  // aprovado (spec §7). É o que garante que ninguém paga por um protocolo recusado.
+  if (evt.status === "authorized") {
+    await sb
+      .from("orders")
+      .update({ payment_status: "authorized" })
+      .eq("id", payment.order_id)
+      .eq("status", "awaiting_payment");
+    await sb.from("order_events").insert({
+      order_id: payment.order_id,
+      label: "Valor reservado",
+      description: "O valor foi reservado no cartão. A cobrança só acontece após a validação clínica.",
+    });
+    await enterClinicalReview(sb, payment.order_id);
+    return { ok: true };
+  }
+
   if (evt.status === "paid") {
-    // Só avança se ainda aguardando — idempotência de estado do pedido.
+    // O FATO "foi pago" vale sempre, independente de onde o pedido está no fluxo.
+    // Separado da transição abaixo porque, na pré-autorização, a captura acontece
+    // com o pedido já fora de `awaiting_payment` — mantê-los juntos deixava o
+    // pedido capturado exibindo "valor reservado" para sempre.
+    await sb.from("orders").update({ payment_status: "paid" }).eq("id", payment.order_id);
+
+    // A transição de ESTADO só acontece a partir de "aguardando pagamento" —
+    // idempotência: webhook repetido não reabre um pedido que já andou.
     const { data: updated } = await sb
       .from("orders")
-      .update({ status: "paid", payment_status: "paid" })
+      .update({ status: "paid" })
       .eq("id", payment.order_id)
       .eq("status", "awaiting_payment")
       .select("id");
@@ -178,6 +227,85 @@ export async function applyOutcome(sb: any, evt: PaymentOutcome): Promise<{ ok: 
     });
   }
   return { ok: true };
+}
+
+/**
+ * Captura uma autorização — chamado quando a revisão clínica APROVA o protocolo.
+ * Só aqui o dinheiro sai da conta do paciente.
+ *
+ * Sem autorização registrada (pedido cobrado direto, ou stub), devolve `skipped`:
+ * o gate clínico não pode travar por causa do modelo de captura configurado.
+ */
+export async function captureAuthorizedPayment(
+  orderId: string,
+): Promise<{ ok: true; captured: boolean } | { error: string; detail?: string }> {
+  const sb: any = createAdminClient();
+  const { data: payment } = await sb
+    .from("payments")
+    .select("id, provider_ref, amount, status")
+    .eq("order_id", orderId)
+    .eq("status", "authorized")
+    .maybeSingle();
+  if (!payment) return { ok: true, captured: false };
+
+  const provider = getPaymentProvider();
+  if (!provider.capture) return { error: "provider_cannot_capture" };
+
+  try {
+    const outcome = await provider.capture({ providerRef: payment.provider_ref });
+    await applyOutcome(sb, outcome);
+    if (outcome.status === "paid") {
+      await sb.from("order_events").insert({
+        order_id: orderId,
+        label: "Pagamento capturado",
+        description: "O valor reservado foi cobrado após a aprovação clínica.",
+      });
+    }
+    return { ok: true, captured: outcome.status === "paid" };
+  } catch (e) {
+    return { error: "capture_failed", detail: (e as Error).message };
+  }
+}
+
+/**
+ * Libera a autorização — chamado quando a revisão clínica REPROVA. Como nada foi
+ * capturado, isso devolve o limite ao paciente sem existir estorno: o dinheiro
+ * nunca saiu. É a razão de ter adotado pré-autorização.
+ */
+export async function releaseAuthorizedPayment(
+  orderId: string,
+): Promise<{ ok: true; released: boolean } | { error: string; detail?: string }> {
+  const sb: any = createAdminClient();
+  const { data: payment } = await sb
+    .from("payments")
+    .select("id, provider_ref, status")
+    .eq("order_id", orderId)
+    .in("status", ["authorized", "paid"])
+    .maybeSingle();
+  if (!payment) return { ok: true, released: false };
+
+  const provider = getPaymentProvider();
+  if (!provider.cancel) return { error: "provider_cannot_cancel" };
+
+  try {
+    const outcome = await provider.cancel({ providerRef: payment.provider_ref });
+    await sb
+      .from("payments")
+      .update({ status: "refunded", raw: outcome.raw, updated_at: new Date().toISOString() })
+      .eq("id", payment.id);
+    await sb.from("orders").update({ payment_status: "refunded" }).eq("id", orderId);
+    await sb.from("order_events").insert({
+      order_id: orderId,
+      label: payment.status === "authorized" ? "Valor liberado" : "Valor estornado",
+      description:
+        payment.status === "authorized"
+          ? "A reserva foi cancelada no cartão. Nenhum valor foi cobrado."
+          : "O valor cobrado foi devolvido.",
+    });
+    return { ok: true, released: true };
+  } catch (e) {
+    return { error: "release_failed", detail: (e as Error).message };
+  }
 }
 
 /**

@@ -17,7 +17,8 @@ export type OrderStatus =
   | "clinically_rejected"
   | "failed";
 
-export type PaymentStatus = "paid" | "pending" | "failed" | "refunded";
+// `authorized` = valor reservado no cartão, ainda NÃO capturado (pré-autorização).
+export type PaymentStatus = "paid" | "pending" | "authorized" | "failed" | "refunded";
 
 export type Supplier = "botane" | "partner";
 

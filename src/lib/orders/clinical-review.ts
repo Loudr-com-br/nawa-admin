@@ -1,6 +1,7 @@
 import "server-only";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from "@/lib/supabase/admin";
+import { captureAuthorizedPayment, releaseAuthorizedPayment } from "@/lib/payments/service";
 
 // Gate de validação clínica (spec §6.2, §7). O pedido pago não vai direto para a
 // produção: para em `in_clinical_review` até um profissional decidir. É o que
@@ -20,27 +21,9 @@ export interface ClinicalReview {
 
 export type ReviewResult = { ok: true; status: string } | { error: string; detail?: string };
 
-/**
- * Coloca o pedido na fila clínica. Chamado quando o pagamento é confirmado.
- * Idempotente e guardado por estado: só sai de `paid`/`awaiting_payment`, então
- * um webhook repetido não puxa de volta um pedido que já foi revisado ou produzido.
- */
-export async function enterClinicalReview(sb: any, orderId: string): Promise<void> {
-  const { data: updated } = await sb
-    .from("orders")
-    .update({ status: "in_clinical_review" })
-    .eq("id", orderId)
-    .in("status", ["awaiting_payment", "paid"])
-    .select("id");
-
-  if (updated?.length) {
-    await sb.from("order_events").insert({
-      order_id: orderId,
-      label: "Enviado para revisão clínica",
-      description: "O protocolo aguarda validação de um profissional antes da produção.",
-    });
-  }
-}
+// `enterClinicalReview` vive em payments/service.ts, e não aqui, para o grafo de
+// imports ficar em uma direção só: a revisão clínica chama o pagamento (captura e
+// liberação), nunca o contrário.
 
 /**
  * Decisão do profissional. Aprovar libera a produção; reprovar interrompe o pedido.
@@ -81,6 +64,21 @@ export async function decideClinicalReview(
   });
   if (reviewErr && !/duplicate key/i.test(reviewErr.message)) {
     return { error: "review_insert_failed", detail: reviewErr.message };
+  }
+
+  // O dinheiro segue a decisão clínica: aprovar CAPTURA a autorização, reprovar
+  // LIBERA o limite. Como nada foi capturado antes daqui, reprovar não gera
+  // estorno — é a razão de o checkout autorizar em vez de cobrar.
+  //
+  // Se o movimento financeiro falhar, a decisão NÃO é registrada: um pedido
+  // aprovado sem captura viraria produção sem receber, e um reprovado sem
+  // liberação deixaria o limite do paciente preso.
+  const money =
+    decision === "approved"
+      ? await captureAuthorizedPayment(orderId)
+      : await releaseAuthorizedPayment(orderId);
+  if ("error" in money) {
+    return { error: "payment_action_failed", detail: money.detail ?? money.error };
   }
 
   const nextStatus = decision === "approved" ? "in_production" : "clinically_rejected";

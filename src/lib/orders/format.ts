@@ -55,6 +55,8 @@ export const paymentStatusConfig: Record<
   { label: string; tone: PaymentTone }
 > = {
   paid: { label: "Pago", tone: "muted" },
+  // Reservado, não recebido — precisa de atenção porque a autorização expira.
+  authorized: { label: "Valor reservado", tone: "warning" },
   pending: { label: "Pendente", tone: "warning" },
   failed: { label: "Falho", tone: "error" },
   refunded: { label: "Reembolsado", tone: "muted" },

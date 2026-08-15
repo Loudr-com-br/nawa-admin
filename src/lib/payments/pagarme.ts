@@ -23,8 +23,10 @@ import type {
 const BASE = process.env.PAGARME_API_URL ?? "https://api.pagar.me/core/v5";
 const TIMEOUT_MS = 20_000;
 
-// `auth_only` reserva o limite sem cobrar — a pré-compra (capturar só após a
-// validação clínica). Default é cobrar na hora; trocar a env não exige deploy de código.
+// Modelo adotado em 14/08: `auth_only` reserva o limite sem cobrar, e a captura
+// acontece quando a revisão clínica aprova. O default do CÓDIGO segue
+// `auth_and_capture` para não mudar o comportamento de quem não configurou nada;
+// o ambiente é que escolhe, sem deploy.
 const OPERATION = (process.env.PAGARME_OPERATION ?? "auth_and_capture") as PaymentOperation;
 
 // Máx. 13 caracteres no PSP — é o que aparece na fatura do cartão.
@@ -103,9 +105,8 @@ async function call(path: string, init: RequestInit): Promise<any> {
 }
 
 /**
- * Traduz o estado da cobrança no Pagar.me para o nosso enum.
- * `authorized_pending_capture` é dinheiro RESERVADO, não recebido — por isso cai em
- * `processing`, e não em `paid`. Tratá-lo como pago liberaria produção sem receber.
+ * Traduz um estado do Pagar.me para o nosso enum. Serve tanto para o status da
+ * cobrança quanto para o da transação — ver `statusOfCharge`, que sabe qual vale.
  */
 function mapChargeStatus(status: string | undefined): PaymentTxnStatus {
   switch (status) {
@@ -113,10 +114,13 @@ function mapChargeStatus(status: string | undefined): PaymentTxnStatus {
     case "captured":
     case "overpaid":
       return "paid";
-    case "pending":
-    case "processing":
+    // Limite reservado, dinheiro NÃO capturado. Distinto de `processing` porque o
+    // paciente já teve o limite comprometido — é o que libera a revisão clínica.
     case "authorized_pending_capture":
     case "waiting_capture":
+      return "authorized";
+    case "pending":
+    case "processing":
     case "underpaid":
       return "processing";
     case "refunded":
@@ -132,6 +136,24 @@ function mapChargeStatus(status: string | undefined): PaymentTxnStatus {
     default:
       return "processing";
   }
+}
+
+/**
+ * Estado de uma cobrança olhando a TRANSAÇÃO antes do envelope.
+ *
+ * Numa pré-autorização o Pagar.me deixa a cobrança em `pending` e guarda o
+ * `authorized_pending_capture` em `last_transaction.status` — ler só o nível de
+ * cima faria uma autorização (limite já reservado) parecer um PIX aguardando
+ * pagamento, e o pedido nunca entraria na revisão clínica.
+ */
+function statusOfCharge(charge: any): PaymentTxnStatus {
+  const tx = charge?.last_transaction?.status;
+  if (tx) {
+    const mapped = mapChargeStatus(tx);
+    // `processing` do nível da transação não acrescenta nada; aí vale o envelope.
+    if (mapped !== "processing") return mapped;
+  }
+  return mapChargeStatus(charge?.status);
 }
 
 /** Extrai a cobrança de um payload de `order` (criamos sempre com uma só). */
@@ -229,7 +251,7 @@ export const pagarmeProvider: PaymentProvider = {
     return {
       providerRef: charge.id,
       clientToken: clientTokenOf(charge),
-      status: mapChargeStatus(charge.status),
+      status: statusOfCharge(charge),
     };
   },
 
@@ -242,7 +264,7 @@ export const pagarmeProvider: PaymentProvider = {
     const charge = await call(`/charges/${input.providerRef}`, { method: "GET" });
     return {
       providerRef: charge.id ?? input.providerRef,
-      status: mapChargeStatus(charge.status),
+      status: statusOfCharge(charge),
       raw: { provider: "pagarme", source: "confirm", status: charge.status, charge },
     };
   },
@@ -255,8 +277,24 @@ export const pagarmeProvider: PaymentProvider = {
     });
     return {
       providerRef: charge.id ?? input.providerRef,
-      status: mapChargeStatus(charge.status),
+      status: statusOfCharge(charge),
       raw: { provider: "pagarme", source: "capture", status: charge.status, charge },
+    };
+  },
+
+  /**
+   * Cancela a cobrança. Numa autorização não capturada o Pagar.me libera o limite;
+   * numa já capturada, vira estorno. Mesmo endpoint para os dois casos.
+   */
+  async cancel(input: CaptureInput): Promise<PaymentOutcome> {
+    const charge = await call(`/charges/${input.providerRef}`, {
+      method: "DELETE",
+      body: JSON.stringify(input.amount != null ? { amount: toCents(input.amount) } : {}),
+    });
+    return {
+      providerRef: charge.id ?? input.providerRef,
+      status: statusOfCharge(charge),
+      raw: { provider: "pagarme", source: "cancel", status: charge.status, charge },
     };
   },
 
@@ -291,7 +329,7 @@ export const pagarmeProvider: PaymentProvider = {
           ? "failed"
           : evt.type === "charge.refunded"
             ? "refunded"
-            : mapChargeStatus(charge.status);
+            : statusOfCharge(charge);
 
     return {
       providerRef,

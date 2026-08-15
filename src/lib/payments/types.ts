@@ -7,9 +7,18 @@ export type PaymentProviderId = "stub" | "pagarme";
 export type PaymentMethod = "pix" | "credit_card" | "boleto";
 
 // Espelha o enum payment_txn_status da migration.
-// `processing` cobre tanto "aguardando o cliente" (PIX não pago) quanto
-// "autorizado, aguardando captura" (pré-compra) — o detalhe fica no `raw`.
-export type PaymentTxnStatus = "created" | "processing" | "paid" | "failed" | "refunded";
+//
+// `authorized` e `processing` NÃO são a mesma coisa, e confundi-los custa caro:
+// `authorized` = limite do paciente já reservado, aguardando captura;
+// `processing` = aguardando o paciente agir (PIX não pago), nada comprometido.
+// Só o primeiro autoriza o pedido a seguir para a revisão clínica.
+export type PaymentTxnStatus =
+  | "created"
+  | "processing"
+  | "authorized"
+  | "paid"
+  | "failed"
+  | "refunded";
 
 export interface PaymentCustomer {
   patientId: string;
@@ -92,4 +101,10 @@ export interface PaymentProvider {
    * provedor que sempre captura na autorização não precisa implementar.
    */
   capture?(input: CaptureInput): Promise<PaymentOutcome>;
+  /**
+   * Cancela a cobrança. Numa autorização ainda não capturada isso LIBERA o limite
+   * do paciente (não é estorno — o dinheiro nunca saiu). Numa cobrança já
+   * capturada, o provedor trata como estorno.
+   */
+  cancel?(input: CaptureInput): Promise<PaymentOutcome>;
 }
