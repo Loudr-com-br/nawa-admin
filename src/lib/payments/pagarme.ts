@@ -23,6 +23,38 @@ import type {
 const BASE = process.env.PAGARME_API_URL ?? "https://api.pagar.me/core/v5";
 const TIMEOUT_MS = 20_000;
 
+// Do payload do Pagar.me declaramos só o que realmente lemos — o resto trafega
+// intacto para `raw`, que é o que guardamos para auditoria da transação.
+interface PagarmeTransaction {
+  status?: string;
+  qr_code?: string;
+  qr_code_url?: string;
+}
+
+interface PagarmeCharge {
+  id?: string;
+  status?: string;
+  last_transaction?: PagarmeTransaction;
+}
+
+interface PagarmeOrder {
+  charges?: PagarmeCharge[];
+}
+
+/** Erro do gateway carregando o contexto da resposta — status e corpo são o que
+ *  permite diagnosticar uma recusa depois, sem repetir a chamada. */
+class PagarmeError extends Error {
+  readonly status: number;
+  readonly body: unknown;
+
+  constructor(message: string, status: number, body: unknown) {
+    super(message);
+    this.name = "PagarmeError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
 // Modelo adotado em 14/08: `auth_only` reserva o limite sem cobrar, e a captura
 // acontece quando a revisão clínica aprova. O default do CÓDIGO segue
 // `auth_and_capture` para não mudar o comportamento de quem não configurou nada;
@@ -70,7 +102,7 @@ function toPhones(raw: string | undefined): Record<string, unknown> | undefined 
   };
 }
 
-async function call(path: string, init: RequestInit): Promise<any> {
+async function call<T>(path: string, init: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: {
@@ -83,7 +115,7 @@ async function call(path: string, init: RequestInit): Promise<any> {
   });
 
   const text = await res.text();
-  let body: any = {};
+  let body: unknown = {};
   try {
     body = text ? JSON.parse(text) : {};
   } catch {
@@ -92,16 +124,16 @@ async function call(path: string, init: RequestInit): Promise<any> {
 
   if (!res.ok) {
     // Os erros do v5 vêm em `errors` (mapa campo → mensagens) ou `message`.
+    const fail = (body ?? {}) as { message?: unknown; errors?: unknown };
     const detail =
-      body?.message ??
-      (body?.errors ? JSON.stringify(body.errors) : null) ??
-      `HTTP ${res.status}`;
-    const err = new Error(`pagarme ${res.status}: ${detail}`);
-    (err as any).status = res.status;
-    (err as any).body = body;
-    throw err;
+      typeof fail.message === "string"
+        ? fail.message
+        : fail.errors
+          ? JSON.stringify(fail.errors)
+          : `HTTP ${res.status}`;
+    throw new PagarmeError(`pagarme ${res.status}: ${detail}`, res.status, body);
   }
-  return body;
+  return body as T;
 }
 
 /**
@@ -146,7 +178,7 @@ function mapChargeStatus(status: string | undefined): PaymentTxnStatus {
  * cima faria uma autorização (limite já reservado) parecer um PIX aguardando
  * pagamento, e o pedido nunca entraria na revisão clínica.
  */
-function statusOfCharge(charge: any): PaymentTxnStatus {
+function statusOfCharge(charge: PagarmeCharge | undefined): PaymentTxnStatus {
   const tx = charge?.last_transaction?.status;
   if (tx) {
     const mapped = mapChargeStatus(tx);
@@ -157,17 +189,17 @@ function statusOfCharge(charge: any): PaymentTxnStatus {
 }
 
 /** Extrai a cobrança de um payload de `order` (criamos sempre com uma só). */
-function firstCharge(order: any): any {
+function firstCharge(order: PagarmeOrder): PagarmeCharge & { id: string } {
   const charge = order?.charges?.[0];
   if (!charge?.id) throw new Error("pagarme: resposta sem charge");
-  return charge;
+  return charge as PagarmeCharge & { id: string };
 }
 
 /**
  * O que o cliente precisa para concluir: no PIX é o copia-e-cola; no cartão a
  * autorização já aconteceu server-side, então não há segredo a devolver.
  */
-function clientTokenOf(charge: any): string {
+function clientTokenOf(charge: PagarmeCharge): string {
   const tx = charge?.last_transaction ?? {};
   return tx.qr_code ?? tx.qr_code_url ?? "";
 }
@@ -217,7 +249,7 @@ export const pagarmeProvider: PaymentProvider = {
       if (!b) throw new Error("pagarme: endereço de cobrança obrigatório para credit_card");
     }
 
-    const order = await call("/orders", {
+    const order = await call<PagarmeOrder>("/orders", {
       method: "POST",
       body: JSON.stringify({
         // `code` amarra o pedido do Pagar.me ao nosso — some no dashboard deles.
@@ -261,7 +293,7 @@ export const pagarmeProvider: PaymentProvider = {
    * pelo `createIntent`. No PIX o desfecho real chega mesmo é pelo webhook.
    */
   async confirm(input: ConfirmInput): Promise<PaymentOutcome> {
-    const charge = await call(`/charges/${input.providerRef}`, { method: "GET" });
+    const charge = await call<PagarmeCharge>(`/charges/${input.providerRef}`, { method: "GET" });
     return {
       providerRef: charge.id ?? input.providerRef,
       status: statusOfCharge(charge),
@@ -271,7 +303,7 @@ export const pagarmeProvider: PaymentProvider = {
 
   /** Captura uma cobrança autorizada (fluxo `auth_only` — pós validação clínica). */
   async capture(input: CaptureInput): Promise<PaymentOutcome> {
-    const charge = await call(`/charges/${input.providerRef}/capture`, {
+    const charge = await call<PagarmeCharge>(`/charges/${input.providerRef}/capture`, {
       method: "POST",
       body: JSON.stringify(input.amount != null ? { amount: toCents(input.amount) } : {}),
     });
@@ -287,7 +319,7 @@ export const pagarmeProvider: PaymentProvider = {
    * numa já capturada, vira estorno. Mesmo endpoint para os dois casos.
    */
   async cancel(input: CaptureInput): Promise<PaymentOutcome> {
-    const charge = await call(`/charges/${input.providerRef}`, {
+    const charge = await call<PagarmeCharge>(`/charges/${input.providerRef}`, {
       method: "DELETE",
       body: JSON.stringify(input.amount != null ? { amount: toCents(input.amount) } : {}),
     });
@@ -312,7 +344,12 @@ export const pagarmeProvider: PaymentProvider = {
     const expected = `Basic ${Buffer.from(`${user}:${pass}`).toString("base64")}`;
     if (!signature || !timingSafeEqual(signature, expected)) throw new Error("invalid_signature");
 
-    const evt = JSON.parse(rawBody) as { type?: string; data?: any };
+    // `data` é a cobrança nos eventos `charge.*` e o pedido nos `order.*` — daí
+    // o tipo carregar as duas formas.
+    const evt = JSON.parse(rawBody) as {
+      type?: string;
+      data?: PagarmeCharge & { charges?: PagarmeCharge[] };
+    };
     const data = evt.data ?? {};
 
     // O evento pode ser de cobrança (`charge.*`, data = a cobrança) ou de pedido
