@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { enforceWriteLimit } from "@/lib/api/rate-limit";
 import { authenticatePatient } from "@/lib/patient/auth";
 import { payOrder } from "@/lib/payments/service";
 import type { BillingAddress, PaymentMethod } from "@/lib/payments/types";
@@ -23,6 +24,12 @@ interface PayBody {
 export async function POST(request: Request) {
   const session = await authenticatePatient(request);
   if (!session) return json({ error: "unauthorized" }, 401);
+
+  // Tentativa de cobrança é o alvo clássico de varredura de cartão: limite
+  // menor que o das demais escritas. Conta por paciente, não por IP — quem
+  // está autenticado não deve ser punido por dividir a rede com outros.
+  const limite = await enforceWriteLimit(request, "checkout:pay", session.patientId, { limit: 8 });
+  if (limite) return limite;
 
   let body: PayBody | null = null;
   try {

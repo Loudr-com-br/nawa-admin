@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { enforceWriteLimit } from "@/lib/api/rate-limit";
 import { authenticateAuthUser } from "@/lib/patient/auth";
 import { resolveOrCreatePatient } from "@/lib/checkout/patient";
 import { createOrderFromCart } from "@/lib/checkout/orders";
@@ -12,6 +13,9 @@ const json = (d: unknown, s = 200) => NextResponse.json(d, { status: s, headers:
 export async function POST(request: Request) {
   const user = await authenticateAuthUser(request);
   if (!user) return json({ error: "unauthorized" }, 401);
+
+  const limite = await enforceWriteLimit(request, "checkout:orders", user.authUserId);
+  if (limite) return limite;
 
   // `shippingOptionId` é a MODALIDADE escolhida, não o preço — a tarifa é
   // resolvida no servidor (spec §9).

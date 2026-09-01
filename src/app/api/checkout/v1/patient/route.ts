@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { enforceWriteLimit } from "@/lib/api/rate-limit";
 import { authenticateAuthUser } from "@/lib/patient/auth";
 import { resolveOrCreatePatient } from "@/lib/checkout/patient";
 
@@ -18,6 +19,9 @@ const json = (d: unknown, s = 200) => NextResponse.json(d, { status: s, headers:
 export async function POST(request: Request) {
   const user = await authenticateAuthUser(request);
   if (!user) return json({ error: "unauthorized" }, 401);
+
+  const limite = await enforceWriteLimit(request, "checkout:patient", user.authUserId);
+  if (limite) return limite;
 
   // Corpo é opcional — o cadastro pode ser completado depois, no pedido.
   let body: { name?: string; cpf?: string; phone?: string } | null = null;
