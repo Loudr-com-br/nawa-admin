@@ -8,3 +8,30 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# ── Headers de segurança ──────────────────────────────────────────────────
+# O Netlify já entrega HSTS e nosniff por padrão; o resto é responsabilidade
+# nossa e não existia. O item que mais importa aqui é o frame-ancestors: sem
+# ele, a tela de login do admin podia ser embutida num iframe de terceiros e
+# usada para roubar clique.
+#
+# A CSP entra em Report-Only de propósito. O MUI injeta estilo em tempo de
+# execução (Emotion) e o Next injeta script inline de hidratação, então uma CSP
+# rígida quebraria a aplicação inteira. Report-Only mede primeiro; quando os
+# relatórios estiverem limpos, troque o nome do header para Content-Security-Policy.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"
+    Cross-Origin-Opener-Policy = "same-origin"
+    X-Content-Type-Options = "nosniff"
+    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; font-src 'self' data:; connect-src 'self' https://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+
+# As respostas de API nunca devem ser embutidas nem adivinhadas por tipo.
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Robots-Tag = "noindex, nofollow"
