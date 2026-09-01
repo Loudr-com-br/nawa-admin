@@ -1,0 +1,58 @@
+name: CI
+
+# Quatro portões antes de qualquer coisa chegar ao ar. São os mesmos comandos
+# que já eram rodados à mão — a diferença é que agora não dá para esquecer.
+#
+# Roda em pull request e em push para dev/main. O deploy continua sendo do
+# Netlify (push em main); este workflow é o que decide se aquele push devia ter
+# acontecido.
+
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+
+# Um PR que recebe vários pushes cancela as execuções antigas.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    name: Tipos, lint, testes e build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Tipos
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Testes
+        run: npm test
+
+      # Falha em vulnerabilidade alta ou crítica. Moderada não bloqueia: o
+      # objetivo é pegar o que importa sem transformar o CI em ruído diário.
+      - name: Dependências vulneráveis
+        run: npm audit --audit-level=high --omit=dev
+
+      # O build é o último portão e o mais completo: é aqui que a validação de
+      # ambiente (lib/env) roda de verdade. O ambiente do CI não tem as chaves
+      # de produção, então o build roda como não-produção de propósito — o
+      # rigor de produção é exercido pelos testes de `lib/env`.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"

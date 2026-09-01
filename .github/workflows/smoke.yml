@@ -1,0 +1,58 @@
+name: Smoke do ambiente publicado
+
+# Verifica um ambiente que JÁ ESTÁ NO AR. É o complemento do CI: aquele prova
+# que o código está correto, este prova que o que subiu está de pé e
+# configurado — inclusive que o webhook de pagamento não aceita o segredo
+# público que já esteve no repositório.
+#
+# Dispara em três situações:
+#  · depois de um push em main (o Netlify leva ~2 min para publicar, por isso
+#    a espera e as tentativas);
+#  · uma vez por dia, para pegar quebra por configuração alterada no painel;
+#  · manualmente, quando alguém quiser conferir.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+    inputs:
+      backoffice:
+        description: URL do backoffice
+        default: https://nawahealth.netlify.app
+      frontoffice:
+        description: URL da loja
+        default: https://nawa-storefront.netlify.app
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Depois de um push, o deploy do Netlify ainda está construindo. Em vez de
+      # exigir um token da API para saber quando terminou, tentamos algumas
+      # vezes: o smoke não altera nada, então repetir é seguro.
+      - name: Smoke (com tentativas enquanto o deploy publica)
+        env:
+          BO: ${{ github.event.inputs.backoffice || 'https://nawahealth.netlify.app' }}
+          FO: ${{ github.event.inputs.frontoffice || 'https://nawa-storefront.netlify.app' }}
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "Aguardando o deploy do Netlify publicar..."
+            sleep 120
+          fi
+          for tentativa in 1 2 3 4; do
+            echo "── tentativa $tentativa ──"
+            if node scripts/smoke.mjs --backoffice="$BO" --frontoffice="$FO"; then
+              exit 0
+            fi
+            [ $tentativa -lt 4 ] && sleep 60
+          done
+          echo "O smoke falhou depois de 4 tentativas."
+          exit 1
