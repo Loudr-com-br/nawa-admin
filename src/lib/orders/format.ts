@@ -67,18 +67,20 @@ export const supplierConfig: Record<Supplier, { label: string }> = {
   partner: { label: "Parceiro" },
 };
 
-/** Ordem canônica dos status para filtros e ordenação. */
-export const orderStatusOrder: OrderStatus[] = [
-  "paid",
-  "in_production",
-  "shipped",
-  "delivered",
-  "failed",
-];
+/**
+ * Ordem canônica dos status para filtros e ordenação.
+ *
+ * DERIVADA do config acima, e não escrita à mão de propósito: os configs são
+ * `Record<OrderStatus, …>`, então o tsc exige que todo valor do enum esteja lá.
+ * Listar de novo aqui já deixou status de fora duas vezes em silêncio —
+ * `awaiting_payment` e os estados do gate clínico —, e o efeito é grave: o
+ * status some do filtro (o médico não conseguia filtrar "Revisão clínica", que
+ * é justamente a fila dele) e o `indexOf` devolve -1, embaralhando a ordenação.
+ * Os configs estão escritos na ordem do ciclo de vida do pedido, que é a ordem
+ * que queremos exibir.
+ */
+export const orderStatusOrder = Object.keys(orderStatusConfig) as OrderStatus[];
 
-export const paymentStatusOrder: PaymentStatus[] = [
-  "paid",
-  "pending",
-  "failed",
-  "refunded",
-];
+export const paymentStatusOrder = Object.keys(
+  paymentStatusConfig
+) as PaymentStatus[];
