@@ -4,7 +4,7 @@
 > Ordem de construção baseada na seção 11 do [`spec.md`](spec.md).
 > Complementos: [`escalabilidade.md`](escalabilidade.md) · [`storefront-api.md`](storefront-api.md)
 >
-> **Última atualização:** 2026-07-24 (Refatoração Catálogo v2 — Fases 0–4 em produção)
+> **Última atualização:** 2026-08-29 (gate clínico + pré-autorização em produção; virada para o modelo médico)
 
 ## Legenda
 
@@ -175,10 +175,23 @@ Módulo mais estratégico.
 
 ## Decisões em aberto (§9.3 / §12)
 
-- [ ] **Emissão fiscal / fulfillment**: quem é o responsável fiscal (NAWA, Botane ou nota dividida). Bloqueia o fluxo de pagamento ponta a ponta.
-- [ ] **Integração Botane**: automática via API ou manual por operador no MVP.
+- [x] **Emissão fiscal / fulfillment** — **DECIDIDO em 2026-08-25: triangulação.** Nota de
+      **medicamento pela Botane** (por regra de custo) e nota de **serviço/acompanhamento médico
+      pela NAWA** (inclui valor fixo de serviço médico), separadas por middleware. O cliente vê
+      **compra unificada** na interface e baixa as notas separadas quando pedir. Isso encerra o
+      aviso amarelo "Decisão fiscal em aberto (§9.3)" que ainda aparece na tela do pedido —
+      **remover esse aviso é trabalho pendente no código.**
+- [~] **Integração Botane**: automática via API ou manual por operador no MVP. **Restrição
+      conhecida (avaliação de 2026-08-10):** o `botane.json` é uma API **read-only** (analytics/DW)
+      — só a direção `import`. **Não existe endpoint para despachar pedido**, então o lado "saída"
+      (`orders.botane_order_ref`) é manual/operador enquanto o cliente não conseguir as **2 APIs**
+      pedidas à Botane (produtos e envio de pedidos). Leitura real bloqueada pela `BOTANE_API_KEY`,
+      que não temos (401 confirmado; só `heartbeat` é aberto).
 - [ ] **GLP-1 original**: NAWA intermedia a compra ou só indica o parceiro.
-- [ ] **Assinatura digital de prescrição**: provedor e lead time.
+- [x] **Assinatura digital de prescrição** — **DECIDIDO em 2026-08-25: solução customizada, NÃO
+      DocuSign.** O médico desenha a assinatura (mouse/dedo) ou escolhe um modelo; ela fica salva
+      no cadastro, associada a **CRM/CPF**, possivelmente com **QR de validação**. Investigar depois
+      as plataformas oficiais dos conselhos. Módulo ainda não construído.
 - [ ] Nomenclatura interna: confirmar termos do cliente para plano/protocolo/fórmula.
 
 ---
@@ -215,3 +228,103 @@ Módulo mais estratégico.
 - **2026-07-29** — **API Painel do paciente (spec §6.3).** `GET /api/patient/{orders,subscriptions,profile}` — auth por **JWT do paciente** (Supabase Auth), escopo por `auth_user_id` no servidor (nunca por parâmetro). `src/lib/patient/{auth,queries}.ts`; middleware libera `/api/patient`. Devolve estado cru (o front traduz, §8). Seed `seed-patient-auth.mjs` linka um paciente a um auth user. **Testado ao vivo:** login → 15 pedidos + assinatura + perfil escopados; 401 sem token. Front `/account` consome (painel logado funcionando).
 - **2026-07-29** — **Fatia anamnese → recomendação → carrinho (início).** Decisões travadas (§11): carrinho no **servidor**, sessão **guest→conta**. Migration `20260729120001_cart.sql` (`carts`/`cart_lines` com **hash** âncora p/ métrica de abandono + `email`/`patient_id`/`status`). Motor de avaliação `evaluate.ts` (score a partir do `risk_weight`, nunca exposto) + **placeholder** de recomendação `recommend.ts` (score→protocolo por faixa; a regra clínica real fica pendente). Endpoints `POST /api/anamnesis/evaluate` e `GET|PATCH /api/cart/[hash]` (auth reusa a chave da Storefront; separação read/write é da semana de fronteira). Storefront de anamnese passou a expor `id` da pergunta; middleware libera `/api/anamnesis` e `/api/cart` (autenticam por chave). **Migration aplicada na Nawa DB, tipos regenerados, tsc+lint limpos.** **Loop testado ao vivo:** `metabolic-reset` (10 perguntas) → score 88 (high) → carrinho "Reset Metabólico Base" + 3 upsells; GET/PATCH (qtd, remoção) e 401 sem chave OK; carrinho persistido no servidor com hash/score/respostas. Próximo: front (renderizar anamnese → submit → tela de carrinho).
 - **2026-07-24** — **Storefront v2 documentada + imagens do catálogo.** `storefront-api.md` reescrito p/ v2 (rotas/shapes reais, fail-closed, purge em cascata). Nota "Antes do lançamento" no plano: **semana dedicada à fronteira de API** (ver `frontoffice/.spec/api-boundary.md`). **Imagens de produto**: migrations `image_url`→`image_urls` (galeria) + bucket público `catalog` (aplicadas no Nawa DB, local↔remote em sync); upload no admin (detalhe do item), lista com capa, detalhe com card "Imagens"; storefront expõe `imageUrl`/`imageUrls`. **Performance**: `next/image` no admin e no front (imagem ~909KB→~31KB). Trabalho na `dev`; **produção não promovida** (deploy `dev`→`main` pendente de OK). Utilitário `scripts/gen-storefront-key.mjs` p/ gerar chave de dev.
+- **2026-08-10** — **Deploy de base + purge coordenado ativo em produção.** `dev`→`main` nos dois
+  repos (backoffice `5e6411b`), primeiro deploy desde 30/07; smoke de prod verde. Os 3 envs de
+  purge setados via Netlify CLI: backoffice `FRONT_REVALIDATE_URL` (é a **BASE** — o código anexa
+  `/api/revalidate`) + `FRONT_REVALIDATE_SECRET`; front recebe o **mesmo** segredo. Secret plano
+  de propósito, p/ não disparar o secrets-scanning do Netlify. **Avaliação Botane** concluída
+  (ver "Decisões em aberto"): read-only, sem endpoint de despacho.
+- **2026-08-14** — **Pagar.me real (API v5) na porta de pagamento** (`a400d35`, `5d8a67a`) —
+  adaptador `src/lib/payments/pagarme.ts` implementando a mesma porta do stub; **nada no checkout
+  mudou**, que era o ponto da abstração. Cartão tokenizado no navegador (sem SDK). Validado em
+  sandbox real. **Armadilhas da v5 que só apareceram contra a API de verdade, cada uma custou uma
+  recusa:** telefone do cliente é **obrigatório**; `billing_address` mora em
+  `payments[].credit_card.card.billing_address` (um nível mais fundo do que parece, e é exigido
+  mesmo pagando por token); **CPF inválido não dá erro de validação, dá RECUSA** (o front passou a
+  validar os dígitos antes de cobrar); o webhook v5 **não assina o corpo com HMAC** — autentica por
+  HTTP Basic cadastrado no painel deles. Cartão de teste que aprova: `4000000000000010`; valores em
+  **centavos**. **Bug próprio, o mais sério:** `payOrder` gravava a linha de `payments` com o status
+  do provedor — com captura direta o Pagar.me devolve a cobrança **já paga**, a linha nascia `paid`,
+  o guarda de idempotência do `applyOutcome` saía cedo e o resultado era **dinheiro capturado com o
+  pedido preso em `awaiting_payment`**. Agora a linha nasce `created` e quem aplica o desfecho é
+  sempre o `applyOutcome`. O stub nunca expôs isso porque abre a cobrança em `processing`.
+  ⚠️ **PIX segue sem nunca ter rodado** — desabilitado nesta conta de sandbox; código pronto.
+  Webhook nunca exercitado (precisa de URL pública).
+- **2026-08-14** — **Frete no pedido** (`96b170c`). Migration `orders.shipping_total` (aditiva,
+  default 0). A tarifa vive em `src/lib/checkout/shipping.ts` — **fonte da verdade no servidor**;
+  o front manda só o **ID da modalidade, nunca o preço**. `GET /api/checkout/v1/shipping` expõe as
+  opções. **Frete grátis = tarifa 0**, é config e não código; ligar os Correios muda só `quoteShipping`.
+- **2026-08-14** — **CPF do paciente** (`da769c0`) e **agenda de endereços** (`b429d90`). Migrations
+  `patients.cpf` e `patient_addresses` + `orders.shipping_address`. O endereço do pedido é
+  **snapshot, não FK** — de propósito: editar ou apagar um endereço não pode reescrever para onde um
+  pedido já foi.
+- **2026-08-14** — **Gate de validação clínica entre pagamento e produção** (`0098e8c`). Migration
+  `20260814150001_clinical_review.sql`: estados `in_clinical_review` e `clinically_rejected` +
+  tabela `clinical_reviews` (autor, data, justificativa; unique por pedido), **separada de
+  `order_events` de propósito** — é registro profissional. Antes disto o pedido pago ia direto p/
+  `in_production`: podia entrar em produção sem nenhum profissional olhar, **enquanto a tela dizia
+  ao paciente que passava por validação clínica**. Autorização no servidor: só `doctor` e
+  `super_admin` decidem; o operador vê a fila mas não assina — é o que sustenta "a NAWA agrega, a
+  responsabilidade clínica tem dono".
+- **2026-08-15** — **Pré-autorização: o dinheiro segue a decisão do médico** (`ee9be31`). Migration
+  `20260814160001_payment_authorized.sql` (`authorized` nos enums de pagamento). O ciclo virou:
+  checkout **reserva** → `in_clinical_review` → aprovar **captura** / reprovar **libera a reserva**.
+  **Isso eliminou a necessidade de estorno** — não existe dinheiro a devolver porque nunca foi
+  capturado. Liga por env `PAGARME_OPERATION=auth_only`. `enterClinicalReview` mora no lado do
+  **pagamento** para o grafo de imports ficar numa direção só (revisão → pagamento, nunca o
+  contrário). **Se o movimento financeiro falhar, a decisão NÃO é registrada:** aprovado sem captura
+  viraria produção sem receber; reprovado sem liberação prenderia o limite do paciente.
+  **Armadilhas que custaram um ciclo cada:** `authorized` ≠ `processing` (autorização = limite
+  comprometido, entra na revisão; PIX pendente = nada comprometido, não entra); o Pagar.me deixa a
+  **cobrança** em `pending` e o `authorized_pending_capture` na **transação**, então `statusOfCharge`
+  precisa ler `last_transaction.status` antes do envelope; `payment_status` ficava preso em
+  `authorized` após a captura porque só era atualizado junto da transição a partir de
+  `awaiting_payment`, que na pré-autorização já tinha ocorrido — o fato "foi pago" agora vale
+  independente do ponto do fluxo.
+- **2026-08-18** — **DEPLOY em produção** (`254ad15`, `dev`→`main`). Sobe o funil completo com
+  pré-autorização, gate clínico, agenda de endereços e frete. Último commit foi só a tipagem do
+  payload do Pagar.me (remoção dos `any`). **Migrations já aplicadas no Nawa DB de produção**
+  (todas aditivas). Verificado ao vivo em 2026-08-29: front `/`=200, backoffice `/`=307→login,
+  `/api/storefront/items` sem key=401, `/api/checkout/v1/shipping`=200.
+- **2026-08-25** — **Reunião de alinhamento — a visão clínica passa a ser do PACIENTE, não do
+  pedido.** É a decisão que mais mexe no que já existe: hoje o gate está preso ao pedido
+  (`clinical_reviews` tem unique por `order_id`, decisão em `/orders/[id]`). O acordado é prontuário
+  + revisão atrelados à **pessoa**, reunindo histórico de tratamentos, evolução (ex.: -20 kg em
+  2 anos) e os últimos ~6 pedidos. Também decidido: **prontuário médico digital** (anamnese,
+  alergias, medicamentos, condições, notas clínicas, fila de revisão); **ambientes separados
+  admin × médico** — mesma base, aplicações distintas, porque o acesso médico **não pode ver visão
+  comercial de receita**, e hoje isso é só um `role` no backoffice único; **teleconsulta com o que
+  já existe** (Google Calendar/Meet + WhatsApp), nada complexo no lançamento; **LGPD** — exclusão
+  precisa existir na interface, com o dado retido em **banco separado e não rastreável** por período
+  curto. Ata: `docs.google.com/document/d/1zG-gM6ZT0VJcC3yXH54HtyDTugEbriBgTRZjvMrU5Ww`.
+- **2026-08-25** — **Tela do médico: o "bug do skeleton" não existia; o defeito real era outro.**
+  Testado logado como `medico.teste@nawahealth.com`: `/orders` e `/orders/[id]` abrem completos, com
+  o painel de decisão (`canDecide` = true). O relato anterior era **erro de teste** — cliques por
+  coordenada erravam o alvo porque o screenshot do automation (1389px) tem escala diferente do
+  viewport real (1571px). **Lição: neste projeto, clicar por `ref` (`read_page`) ou por `.click()`
+  via JS, nunca por coordenada** (vale também para os radios da anamnese). **O defeito real:**
+  `orderStatusOrder` e `paymentStatusOrder` (`lib/orders/format.ts`) eram listas escritas à mão e
+  **incompletas** — faltavam `awaiting_payment`, `in_clinical_review`, `clinically_rejected` e
+  `authorized`. Efeito: **"Revisão clínica" não existia no filtro de status**, ou seja, o médico não
+  conseguia isolar a própria fila, e o `indexOf` devolvia -1, embaralhando a ordenação. Agora as duas
+  listas são **derivadas dos configs** (`Object.keys(orderStatusConfig)`), que são
+  `Record<OrderStatus, …>` e portanto exaustivos por tsc — não dá mais para um status novo sumir do
+  filtro em silêncio. `StatusChip` ganhou **fallback** para status desconhecido (a causa do "`cfg`
+  undefined derruba a tela", que já bateu duas vezes: `awaiting_payment` e `authorized`).
+  ⚠️ **Em disco, ainda NÃO commitado.**
+- **2026-08-25** — **Bug do endereço no checkout: 401 em todo cadastro novo.** A linha em `patients`
+  só nascia em `resolveOrCreatePatient`, chamada de um único lugar — o `finalizeOrder` do bloco 3.
+  Mas a conta é criada no **bloco 1**. Entre os dois, o cliente tinha **JWT válido e nenhuma linha em
+  `patients`**, e `authenticatePatient` recusa exatamente esse estado → **401 ao salvar endereço no
+  bloco 2, para todo cadastro novo**. Nunca apareceu antes porque os testes usavam um paciente do
+  seed, que já tinha a linha. **Correção (em disco, NÃO commitada):** rota nova
+  `POST /api/checkout/v1/patient` que só chama `resolveOrCreatePatient` (idempotente — reusa a linha
+  e completa campos em branco), chamada pelo front no signUp/signIn do bloco 1.
+- **2026-08-29** — **`scripts/create-internal-user.mjs`** (novo, não commitado). Cria a conta no Auth
+  **e** concede papel em `users_internal` num passo só. O `seed-admin.mjs` não servia sozinho: exige
+  que a conta **já exista** no Auth (criada à mão no painel) e concede `super_admin` fixo — este
+  recebe o papel como argumento, porque `app_role` tem quatro valores e o default da coluna
+  (`operator`) raramente é o desejado. **Sem `--yes` é dry-run**, imprimindo só o host do projeto
+  alvo, porque isto costuma rodar contra produção e confirmar o alvo é barato. Idempotente: se o
+  e-mail já existe no Auth, **reusa e não sobrescreve a senha**. Nunca imprime segredos. Guardas
+  verificados (papel inválido, credencial ausente, argumentos faltando → saída limpa, exit 1).
