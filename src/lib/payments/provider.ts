@@ -2,10 +2,12 @@ import "server-only";
 import { pagarmeProvider } from "./pagarme";
 import { stubProvider } from "./stub";
 import type { PaymentProvider, PaymentProviderId } from "./types";
+import { env } from "@/lib/env";
 
-// Seleção do provedor por ambiente. Default: stub (sem chaves, sem rede).
-// `PAYMENT_PROVIDER=pagarme` liga o adapter real — nada no checkout muda.
-const CONFIGURED = (process.env.PAYMENT_PROVIDER ?? "stub") as PaymentProviderId;
+// Seleção do provedor por ambiente. NÃO tem valor padrão em produção: escolher
+// entre cobrar de verdade e simular é uma decisão, e `lib/env` recusa o deploy
+// se a variável faltar. Em desenvolvimento o padrão segue sendo `stub`.
+const CONFIGURED = env.PAYMENT_PROVIDER as PaymentProviderId;
 
 export function getPaymentProvider(): PaymentProvider {
   switch (CONFIGURED) {

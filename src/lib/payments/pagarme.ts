@@ -1,4 +1,5 @@
 import "server-only";
+import { env, pagarmeSecretKey } from "@/lib/env";
 import type {
   CaptureInput,
   ConfirmInput,
@@ -59,17 +60,19 @@ class PagarmeError extends Error {
 // acontece quando a revisão clínica aprova. O default do CÓDIGO segue
 // `auth_and_capture` para não mudar o comportamento de quem não configurou nada;
 // o ambiente é que escolhe, sem deploy.
-const OPERATION = (process.env.PAGARME_OPERATION ?? "auth_and_capture") as PaymentOperation;
+// Sem padrão: assumir `auth_and_capture` calado desfaz a pré-autorização e faz
+// o paciente pagar ANTES da avaliação médica — exatamente o que o gate clínico
+// existe para impedir. `lib/env` exige a escolha explícita.
+const OPERATION = env.PAGARME_OPERATION as PaymentOperation;
 
 // Máx. 13 caracteres no PSP — é o que aparece na fatura do cartão.
-const STATEMENT = (process.env.PAGARME_STATEMENT_DESCRIPTOR ?? "NAWA").slice(0, 13);
+const STATEMENT = env.PAGARME_STATEMENT_DESCRIPTOR.slice(0, 13);
 
 function secretKey(): string {
-  // `PAGARME_API_KEY` é o nome que o painel do Pagar.me usa; `PAGARME_SECRET_KEY`
-  // fica como alias para não quebrar quem já configurou com o outro nome.
-  const key = process.env.PAGARME_API_KEY ?? process.env.PAGARME_SECRET_KEY;
-  if (!key) throw new Error("PAGARME_API_KEY ausente");
-  return key;
+  // Os dois nomes são aceitos e normalizados em `lib/env`, que também já barrou
+  // o deploy publicado sem chave quando PAYMENT_PROVIDER=pagarme.
+  if (!pagarmeSecretKey) throw new Error("PAGARME_API_KEY ausente");
+  return pagarmeSecretKey;
 }
 
 /** Basic auth: chave secreta como usuário, senha vazia. */
@@ -337,8 +340,8 @@ export const pagarmeProvider: PaymentProvider = {
    * constante para não vazar o segredo por tempo de resposta.
    */
   parseWebhook(rawBody: string, signature: string | null): PaymentOutcome {
-    const user = process.env.PAGARME_WEBHOOK_USER;
-    const pass = process.env.PAGARME_WEBHOOK_PASSWORD;
+    const user = env.PAGARME_WEBHOOK_USER;
+    const pass = env.PAGARME_WEBHOOK_PASSWORD;
     if (!user || !pass) throw new Error("PAGARME_WEBHOOK_USER/PASSWORD ausentes");
 
     const expected = `Basic ${Buffer.from(`${user}:${pass}`).toString("base64")}`;
