@@ -57,10 +57,7 @@ export async function hitRateLimit(
 
   try {
     const sb = createAdminClient();
-    // O cast existe porque `database.types.ts` é gerado a partir do banco e só
-    // conhece `rate_hit` depois que a migration 20260901120001 for aplicada e
-    // os tipos regerados (`npm run db:types`). O formato está fixado aqui.
-    const { data, error } = await (sb.rpc as unknown as RateHitRpc)("rate_hit", {
+    const { data, error } = await sb.rpc("rate_hit", {
       p_scope: scope,
       p_subject: subject,
       p_limit: limit,
@@ -91,15 +88,6 @@ export async function hitRateLimit(
     return fallback;
   }
 }
-
-/** Formato de `rate_hit` (ver a migration 20260901120001). */
-type RateHitRpc = (
-  fn: "rate_hit",
-  args: { p_scope: string; p_subject: string; p_limit: number; p_window_seconds: number },
-) => PromiseLike<{
-  data: { allowed: boolean; remaining: number; reset_at: string }[] | null;
-  error: { message: string } | null;
-}>;
 
 /**
  * Aplica o limite e devolve a resposta 429 pronta, ou `null` para seguir.

@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -1062,6 +1062,27 @@ export type Database = {
           },
         ]
       }
+      rate_limits: {
+        Row: {
+          count: number
+          scope: string
+          subject: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          scope: string
+          subject: string
+          window_start: string
+        }
+        Update: {
+          count?: number
+          scope?: string
+          subject?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       storefront_rate_limits: {
         Row: {
           count: number
@@ -1252,6 +1273,20 @@ export type Database = {
       }
       immutable_unaccent: { Args: { "": string }; Returns: string }
       is_super_admin: { Args: never; Returns: boolean }
+      rate_hit: {
+        Args: {
+          p_limit: number
+          p_scope: string
+          p_subject: string
+          p_window_seconds: number
+        }
+        Returns: {
+          allowed: boolean
+          remaining: number
+          reset_at: string
+        }[]
+      }
+      rate_limits_purge: { Args: never; Returns: undefined }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       storefront_rate_hit: {
