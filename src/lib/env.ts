@@ -19,16 +19,29 @@ import { z } from "zod";
  * antes de atender a primeira requisição.
  */
 
-const isProd = process.env.NODE_ENV === "production";
+/**
+ * O contexto vem do Netlify (`production`, `deploy-preview`, `branch-deploy`).
+ * Fora dele — máquina local, CI — não existe contexto de deploy.
+ *
+ * NÃO derivar isto de NODE_ENV: `next build` define NODE_ENV=production em
+ * qualquer build, inclusive no CI e no `npm run build` local. Usar NODE_ENV
+ * fazia o CI ser tratado como deploy de produção e falhar por não ter as chaves
+ * — que ele não deve ter mesmo.
+ */
+export const DEPLOY_CONTEXT = process.env.CONTEXT ?? "local";
 
-/** Netlify marca o contexto do deploy; fora dele, caímos no NODE_ENV. */
-export const DEPLOY_CONTEXT = process.env.CONTEXT ?? (isProd ? "production" : "dev");
-
-/** Só o deploy de produção é rigoroso — preview e branch deploy seguem soltos. */
-const strict = DEPLOY_CONTEXT === "production";
+/**
+ * Só o deploy de produção é rigoroso. Preview, branch deploy, CI e máquina
+ * local seguem soltos: o rigor existe para impedir que um ambiente ATENDENDO
+ * TRÁFEGO suba mal configurado, não para atrapalhar quem está construindo.
+ *
+ * `ENV_STRICT=true` força o rigor em qualquer lugar — útil para conferir a
+ * configuração antes de promover.
+ */
+const strict = DEPLOY_CONTEXT === "production" || process.env.ENV_STRICT === "true";
 
 const required = (nome: string) =>
-  z.string().min(1, `${nome} é obrigatório quando CONTEXT=production`);
+  z.string().min(1, `${nome} é obrigatório no deploy de produção`);
 
 /** Em produção exige; fora dela aceita ausente. */
 const requiredInProd = (nome: string) =>

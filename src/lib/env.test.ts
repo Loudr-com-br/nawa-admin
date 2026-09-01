@@ -119,6 +119,29 @@ describe("ambiente publicado", () => {
   });
 });
 
+describe("build fora do Netlify", () => {
+  it("não trata um build de CI como deploy de produção", async () => {
+    // `next build` define NODE_ENV=production em QUALQUER build. Derivar o rigor
+    // disso fazia o CI — que legitimamente não tem as chaves — falhar.
+    // O contexto de deploy vem do Netlify, e só dele.
+    const { env, DEPLOY_CONTEXT } = await carregar({
+      CONTEXT: undefined,
+      NODE_ENV: "production",
+      CI: "true",
+      PAYMENT_PROVIDER: undefined,
+      NEXT_PUBLIC_SUPABASE_URL: undefined,
+    });
+    expect(DEPLOY_CONTEXT).toBe("local");
+    expect(env.PAYMENT_PROVIDER).toBe("stub");
+  });
+
+  it("permite forçar o rigor com ENV_STRICT, para conferir antes de promover", async () => {
+    await expect(
+      carregar({ CONTEXT: undefined, ENV_STRICT: "true", PAYMENT_PROVIDER: undefined }),
+    ).rejects.toThrow(/PAYMENT_PROVIDER/);
+  });
+});
+
 describe("desenvolvimento", () => {
   it("segue rodando sem configuração, assumindo o stub", async () => {
     // O rigor é só do ambiente publicado — quebrar o `npm run dev` de quem

@@ -74,9 +74,10 @@ sozinho:
 |---|---|
 | `production` | Toda configuração crítica é **obrigatória**. Faltou, o build falha. |
 | `deploy-preview`, `branch-deploy` | Aceita ausências, avisa no log. |
-| ausente (local) | Modo desenvolvimento: assume `stub`, avisa no console. |
+| ausente (local, CI) | Modo desenvolvimento: assume `stub`, avisa no console. Nunca derivado de `NODE_ENV`, que o `next build` define como `production` em qualquer build. |
 
-O rigor vale só para o deploy de produção de propósito — quebrar o `npm run dev`
+`ENV_STRICT=true` força o rigor em qualquer lugar, para conferir a configuração
+antes de promover. O rigor vale só para o deploy de produção de propósito — quebrar o `npm run dev`
 de quem acabou de clonar o repositório não protegeria ninguém.
 
 ## Migrations daqui em diante
