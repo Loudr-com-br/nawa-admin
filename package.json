@@ -12,7 +12,11 @@
     "seed:data": "node --env-file=.env.local scripts/seed-data.mjs",
     "seed:anamnesis": "node --env-file=.env.local scripts/seed-anamnesis.mjs",
     "seed:subscriptions": "node --env-file=.env.local scripts/seed-subscriptions.mjs",
-    "seed:orders": "node --env-file=.env.local scripts/seed-orders-bulk.mjs"
+    "seed:orders": "node --env-file=.env.local scripts/seed-orders-bulk.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "@emotion/cache": "^11.14.0",
@@ -37,6 +41,10 @@
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.37.0",
     "eslint-config-next": "^15.4.6",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "postcss": "^8.5.26"
   }
 }
