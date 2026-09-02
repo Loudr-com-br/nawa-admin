@@ -19,6 +19,9 @@ pagamento em sandbox.
 3. **Depois** leia a [auditoria de arquitetura](https://claude.ai/code/artifact/4185b240-b6e8-4c06-83b9-1c0a5bc6bba0), que traz o diagnóstico de 01/09 com a
    situação de cada achado.
 
+O [mapa navegável da arquitetura](https://claude.ai/code/artifact/9c654635-b93c-4b03-b238-23364b1c2b60) complementa os três: mostra cada bloco da
+plataforma com status, dependências e o fluxo do pedido ponta a ponta.
+
 ## Os dois repositórios
 
 | Repositório | Papel |
@@ -37,7 +40,7 @@ Um único sistema tem acesso ao Postgres, e essa decisão sustenta o resto.
 | [`.spec/spec.md`](.spec/spec.md) | Especificação de produto — fonte da verdade |
 | [`.spec/plan.md`](.spec/plan.md) | Plano vivo: o que está feito, o que falta e por quê |
 | [`.spec/ambientes.md`](.spec/ambientes.md) | Ambientes, rigor de configuração, como criar o staging |
-| [`.spec/arquitetura.html`](.spec/arquitetura.html) | Mapa visual navegável da plataforma |
+| [`.spec/arquitetura.html`](.spec/arquitetura.html) | Mapa visual navegável da plataforma — [versão publicada](https://claude.ai/code/artifact/9c654635-b93c-4b03-b238-23364b1c2b60) |
 | [`.spec/storefront-api.md`](.spec/storefront-api.md) | Contrato da Storefront API |
 | [`.spec/api-boundary.md`](https://github.com/Loudr-com-br/nawa-frontoffice/blob/main/.spec/api-boundary.md) | Fronteira de API (no repo do front) — reservar uma semana antes do lançamento |
 
