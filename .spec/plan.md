@@ -4,7 +4,7 @@
 > Ordem de construção baseada na seção 11 do [`spec.md`](spec.md).
 > Complementos: [`escalabilidade.md`](escalabilidade.md) · [`storefront-api.md`](storefront-api.md)
 >
-> **Última atualização:** 2026-08-29 (gate clínico + pré-autorização em produção; virada para o modelo médico)
+> **Última atualização:** 2026-09-02 (endurecimento pós-auditoria: validação de ambiente, rate limit de escrita, headers, CI, testes e smoke — tudo em produção)
 
 ## Legenda
 
@@ -328,3 +328,90 @@ Módulo mais estratégico.
   alvo, porque isto costuma rodar contra produção e confirmar o alvo é barato. Idempotente: se o
   e-mail já existe no Auth, **reusa e não sobrescreve a senha**. Nunca imprime segredos. Guardas
   verificados (papel inválido, credencial ausente, argumentos faltando → saída limpa, exit 1).
+
+---
+
+## Endurecimento pós-auditoria (2026-09-01/02) — EM PRODUÇÃO
+
+> Auditoria completa de arquitetura, segurança e desempenho conduzida em 01/09 sobre o
+> código e a configuração real. Documento de transferência técnica em
+> [`ambientes.md`](ambientes.md) para a parte de ambientes.
+>
+> **Contexto:** este ambiente é de DESENVOLVIMENTO — sem cliente real, pagamento em
+> sandbox. Os achados críticos valiam como dívida a pagar antes de haver tráfego.
+
+### O que a auditoria encontrou de crítico
+
+- [x] **Produção rodava o provedor de pagamento `stub`.** `PAYMENT_PROVIDER ?? "stub"` sem
+      a variável definida no Netlify — o checkout completava sem cobrar nada.
+- [x] **O webhook aceitava um segredo público.** `STUB_PAYMENT_WEBHOOK_SECRET ?? "stub-secret"`
+      deixava valendo uma constante escrita neste repositório: qualquer pessoa marcava um
+      pedido como pago. Confirmado por sondagem (400 = assinatura aceita) e fechado (401).
+- [x] **`PAGARME_OPERATION` assumia `auth_and_capture`** em silêncio, o que desfaz a
+      pré-autorização e cobra antes da avaliação médica.
+
+Os três tinham a **mesma causa**: comportamento crítico decidido por um `??` silencioso.
+
+### O que foi construído
+
+- [x] **`src/lib/env.ts`** — validação zod de todas as variáveis, no build e no boot
+      (`src/instrumentation.ts`). Em deploy de produção, configuração crítica ausente
+      **derruba o build** com a lista do que falta. Sem padrão para provedor, segredo de
+      webhook e modo de captura. Trava `PAGARME_ALLOW_LIVE` para chave `sk_live_`.
+      **O rigor vem de `CONTEXT` (Netlify), nunca de `NODE_ENV`** — `next build` define
+      NODE_ENV=production em qualquer build, inclusive no CI. `ENV_STRICT=true` força.
+- [x] **Rate limit das rotas de escrita** — migration `20260901120001`, tabela `rate_limits`
+      e função `rate_hit`, mesmo desenho atômico do limitador da Storefront mas com sujeito
+      textual (`patient:<id>` ou `ip:<addr>`). Aplicado em `/checkout/v1/{pay,orders,patient}`
+      e no webhook; `pay` usa limite menor por ser alvo de varredura de cartão.
+      Fail-open **com log alto** — controle de segurança não pode falhar em silêncio.
+- [x] **Headers de segurança** em `next.config.ts` — X-Frame-Options, Referrer-Policy,
+      Permissions-Policy, COOP e CSP em Report-Only. **Não no `netlify.toml`:** aquele bloco
+      só alcança arquivos estáticos, e as páginas do Next são servidas por função. A primeira
+      tentativa entregou os headers no favicon e não no `/login`.
+- [x] **Suíte de testes (Vitest)** — 36 no backoffice, cobrindo o que já quebrou: ordem dos
+      status (o filtro que escondeu a fila do médico), webhook do stub, validação de ambiente
+      em todas as combinações, frete resolvido no servidor, hash das chaves, sujeito do limite.
+- [x] **CI (GitHub Actions)** — tipos, lint, testes, `npm audit --audit-level=high` e build,
+      em PR e push para `dev`/`main`.
+- [x] **Smoke pós-deploy** (`scripts/smoke.mjs`) — 10 verificações contra o ambiente publicado,
+      nenhuma altera dado. A principal: o webhook recusando o segredo público. Roda após push
+      em `main`, diariamente e sob demanda.
+- [x] **`scripts/db-migrate.mjs`** — aplica migrations em qualquer projeto alvo, dry-run por
+      padrão imprimindo só o host. Prepara a separação de ambientes.
+- [x] **Dependências** — zero vulnerabilidades. `overrides` fixando postcss corrigido, em vez
+      de `audit fix --force`, que trocaria o Next por uma major.
+
+### O pipeline provou o próprio valor na estreia
+
+- O **CI reprovou** um defeito no `lib/env` recém-escrito (rigor derivado de `NODE_ENV`).
+- O **smoke reprovou** o deploy dos headers por estarem no arquivo errado.
+- Os dois passaram por `tsc` e build limpos. Reforça o aprendizado de 14/08: **typecheck não
+  substitui exercitar o ambiente**.
+
+### Desempenho medido (02/09)
+
+| Medição | Resultado |
+|---|---|
+| Aplicação, build de produção local, 1 instância | satura em **~2.000 req/s**, zero erro até 200 simultâneos |
+| Runtime sem banco | p50 **5 ms** |
+| Consulta real ao Postgres (sa-east-1) | p50 **201 ms** — 40× o runtime |
+| Home estática (CDN) vs página de produto (SSR) | **62 ms** vs **700 ms** |
+
+> A diferença de 40× entre runtime e banco, e de 10× entre estático e renderizado, é o
+> argumento numérico para tornar as páginas de produto estáticas com revalidação —
+> promovido de melhoria a prioridade.
+
+### Pendente
+
+- [ ] **Cadastrar o webhook no painel do Pagar.me** (`nawa` + senha em
+      `netlify env:get PAGARME_WEBHOOK_PASSWORD`). Sem isso a cobrança autoriza mas a
+      confirmação volta 401 e o pedido não avança.
+- [ ] **Criar o Supabase de staging** — caminho pronto, ver [`ambientes.md`](ambientes.md).
+- [ ] **Verificar plano e política de backup** do Supabase (dado clínico com backup só
+      diário é risco desproporcional ao custo de corrigir).
+- [ ] **Sentry** — único P1 da auditoria sem endereçamento; depende da conta.
+- [ ] **SMTP próprio no Supabase Auth** — o servidor compartilhado limita envios por hora e
+      trava cadastro real de cliente. Bloqueador silencioso de lançamento.
+- [ ] Testes de integração do fluxo de dinheiro (dependem do staging).
+- [ ] Escopo de chave read/write na Storefront.
