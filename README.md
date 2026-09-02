@@ -8,12 +8,17 @@ e área médica) é headless e consome o que o backoffice publica via **Storefro
 
 ## Documentação
 
+> **Assumindo o projeto agora?** Comece por [`HANDOVER.md`](HANDOVER.md).
+
 | Doc | Conteúdo |
 |---|---|
+| [`HANDOVER.md`](HANDOVER.md) | Ponto de entrada: por onde começar, contas, o que fazer primeiro |
 | [`.spec/spec.md`](.spec/spec.md) | Especificação de produto (fonte da verdade) |
 | [`.spec/plan.md`](.spec/plan.md) | Plano de trabalho vivo (o que está feito / a fazer) |
 | [`.spec/storefront-api.md`](.spec/storefront-api.md) | Guia da Storefront API para o front |
 | [`.spec/escalabilidade.md`](.spec/escalabilidade.md) | Estratégia de escala (cache, purge, fila) |
+| [`.spec/ambientes.md`](.spec/ambientes.md) | Ambientes, rigor de configuração e como criar o staging |
+| [`.spec/arquitetura.html`](.spec/arquitetura.html) | Mapa visual da plataforma (abrir em servidor local, ver abaixo) |
 | [`ds/design.md`](ds/design.md) | Identidade visual / Design System |
 
 ## Stack
@@ -64,13 +69,77 @@ npm run seed:orders         # ~180 pedidos distribuídos em 60 dias (dashboard)
 
 ```bash
 npm install
-npm run dev     # http://localhost:3000  (protege rotas; redireciona p/ /login)
+# A porta 3200 é convenção do projeto: o .env.local do frontoffice aponta para
+# o backoffice em localhost:3200. Sem o -p, o Next sobe na 3000 e o front não acha.
+npm run dev -- -p 3200        # protege rotas; redireciona p/ /login
 ```
 
 ```bash
-npm run build   # build de produção
-npm run start   # servir o build
-npm run lint    # eslint (next lint)
+npm run build      # build de produção
+npm run start      # servir o build
+npm run lint       # eslint (next lint)
+```
+
+## Qualidade
+
+Quatro portões rodam no CI (GitHub Actions) em cada pull request e em cada push
+para `dev` e `main` — os mesmos comandos que dá para rodar aqui:
+
+```bash
+npm run typecheck  # tsc --noEmit
+npm run lint
+npm test           # Vitest — 36 testes, sem banco, menos de 1s
+npm audit --audit-level=high --omit=dev
+npm run build      # exercita a validação de ambiente (src/lib/env.ts)
+```
+
+Depois de publicar, o **smoke** verifica o ambiente que subiu. Dez verificações,
+nenhuma altera dado; a principal é o webhook de pagamento recusando assinatura
+inválida. Roda sozinho após push em `main`, uma vez por dia e sob demanda:
+
+```bash
+npm run smoke
+npm run smoke -- --backoffice=https://... --frontoffice=https://...
+```
+
+> **Os testes cobrem o que já quebrou**, não cobertura ampla: ordem dos status do
+> pedido, webhook do stub, validação de ambiente, frete resolvido no servidor,
+> hash das chaves de API e o sujeito do rate limit.
+
+## Banco de dados
+
+```bash
+npm run db:types   # regenera src/lib/supabase/database.types.ts a partir do banco
+
+# Migrations em um projeto alvo. Sem --yes é DRY-RUN e imprime só o host —
+# confirmar contra qual banco se está escrevendo é barato, o engano é caro.
+node scripts/db-migrate.mjs --db-url="postgresql://..."
+node scripts/db-migrate.mjs --db-url="postgresql://..." --yes
+
+# Cria usuário interno (conta no Auth + papel em users_internal) num passo.
+node scripts/create-internal-user.mjs email@nawahealth.com.br <senha> <papel> --yes
+```
+
+> ⚠️ **Hoje há um projeto Supabase só**, compartilhado entre desenvolvimento e o
+> ambiente publicado. Ver [`.spec/ambientes.md`](.spec/ambientes.md) para separar.
+
+## Configuração
+
+`src/lib/env.ts` valida as variáveis com zod, no build e no boot. Em deploy de
+produção, **configuração crítica ausente derruba o build** com a lista do que
+falta — provedor de pagamento, segredo de webhook e modo de captura não têm valor
+padrão. O rigor vem de `CONTEXT` (definido pelo Netlify) e nunca de `NODE_ENV`,
+que o `next build` define como produção em qualquer build. Para conferir fora do
+Netlify, `ENV_STRICT=true` força.
+
+## Mapa da arquitetura
+
+`.spec/arquitetura.html` é um mapa navegável da plataforma. O Chrome bloqueia
+`file://`, então sirva por HTTP:
+
+```bash
+python3 -m http.server 8080 --bind 127.0.0.1
+# abrir http://127.0.0.1:8080/.spec/arquitetura.html
 ```
 
 ## Storefront API

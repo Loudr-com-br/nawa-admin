@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NAWA — Arquitetura da Plataforma</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  /* ===== Tokens reais do Design System NAWA (globals.css / tokens.ts) ===== */
+  :root{
+    --brand:#204FF1; --brand-dark:#0619AD; --brand-white:#D5D5D5;
+    --blue-50:#EEF2FE; --blue-100:#D6DFFE; --blue-200:#ADBFFE; --blue-500:#204FF1; --blue-700:#0619AD; --blue-900:#030A52;
+    --n0:#FFFFFF; --n50:#F8F8F8; --n100:#F0F0F0; --n200:#E0E0E0; --n400:#A0A0A0; --n600:#606060; --n900:#111111;
+    --success:#22C55E; --success-l:#DCFCE7; --warning:#F59E0B; --warning-l:#FEF9C3;
+    --error:#EF4444; --error-l:#FEE2E2; --info:#3B82F6; --info-l:#DBEAFE;
+    --page:#F8F8F8; --card:#FFFFFF; --ink:#111111; --ink-2:#606060; --ink-3:#A0A0A0;
+    --line:#EDEEF0; --line-2:#E0E0E0; --focus:#204FF1;
+    --r-sm:4px; --r-md:8px; --r-lg:12px; --r-xl:16px; --r-2xl:24px; --r-full:9999px;
+    --sh-sm:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04);
+    --sh-md:0 4px 12px rgba(0,0,0,.10),0 2px 6px rgba(0,0,0,.06);
+    --sh-lg:0 12px 32px rgba(0,0,0,.12),0 4px 12px rgba(0,0,0,.08);
+    --ease:cubic-bezier(.4,0,.2,1); --fast:150ms; --normal:250ms;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    /* Poppins = fonte de suporte oficial do DS (§3), no lugar da AT Aero */
+    --sans:"Poppins",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --z-front:#4C7DFF; --z-bound:#204FF1; --z-back:#0619AD; --z-int:#606060;
+    --clinical:#0D9488; /* camada clínica regulada — cor com significado */
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--page);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  /* largura inteira da janela — sem max-width central, sem rolagem lateral */
+  .wrap{width:100%;margin:0;padding:28px clamp(20px,3vw,44px) 72px}
+  ::selection{background:var(--blue-100)}
+
+  header.top{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end;justify-content:space-between;margin-bottom:22px}
+  .brand{display:flex;align-items:center;gap:15px}
+  .logo{width:46px;height:46px;border-radius:var(--r-lg);background:var(--brand);display:grid;place-items:center;color:#fff;
+    font-weight:800;font-size:22px;letter-spacing:.02em;box-shadow:var(--sh-sm)}
+  h1{font-size:26px;margin:0;font-weight:800;letter-spacing:-.02em;line-height:1.05}
+  .sub{color:var(--ink-2);font-size:13.5px;margin-top:4px}
+  .meta{color:var(--ink-3);font-size:12px;margin-top:3px}
+  .actions{display:flex;gap:9px;flex-wrap:wrap}
+  button{font-family:inherit;font-size:13px;font-weight:600;color:var(--ink);background:var(--card);border:1px solid var(--line-2);
+    padding:10px 15px;border-radius:var(--r-md);cursor:pointer;transition:var(--fast) var(--ease);display:inline-flex;align-items:center;gap:7px}
+  button:hover{border-color:var(--brand);color:var(--brand)}
+  button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+  button.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+  button.primary:hover{background:var(--brand-dark);border-color:var(--brand-dark);color:#fff}
+
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+  .tlabel{font-size:11px;color:var(--ink-3);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-right:2px}
+  .sep{width:1px;height:20px;background:var(--line-2);margin:0 6px}
+  .chip{font-size:12.5px;font-weight:600;color:var(--ink-2);background:var(--card);border:1px solid var(--line-2);
+    padding:6px 13px;border-radius:var(--r-full);cursor:pointer;transition:var(--fast) var(--ease);display:inline-flex;align-items:center;gap:7px}
+  .chip:hover{border-color:var(--brand)}
+  .chip:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+  .chip .dot{width:8px;height:8px;border-radius:var(--r-full);background:currentColor}
+  .chip[aria-pressed="true"]{color:#fff;border-color:transparent;background:var(--ink)}
+  .chip[data-val="frontoffice"][aria-pressed="true"]{background:var(--z-front)}
+  .chip[data-val="boundary"][aria-pressed="true"]{background:var(--z-bound)}
+  .chip[data-val="backoffice"][aria-pressed="true"]{background:var(--z-back)}
+  .chip[data-val="integrations"][aria-pressed="true"]{background:var(--z-int)}
+  .chip[data-val="prod"][aria-pressed="true"]{background:var(--success)}
+  .chip[data-val="partial"][aria-pressed="true"]{background:var(--warning)}
+  .chip[data-val="todo"][aria-pressed="true"]{background:var(--n400)}
+  .chip[data-val="thirdparty"][aria-pressed="true"]{background:var(--n600)}
+  .hint{color:var(--ink-3);font-size:12px;margin-left:auto}
+
+  .summary{display:flex;flex-wrap:wrap;gap:20px;align-items:center;margin:0 0 16px;padding:12px 16px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-sm)}
+  .summary .s{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2)}
+  .summary .s b{color:var(--ink);font-weight:700}
+  .summary .sd{width:9px;height:9px;border-radius:var(--r-full)}
+  .summary .bar{flex:1;min-width:200px;height:8px;border-radius:var(--r-full);overflow:hidden;display:flex;background:var(--n100)}
+  .summary .bar i{height:100%}
+
+  .canvas{position:relative;padding:4px 0 8px} /* sem caixa externa — as conexões precisam aparecer */
+  .board{position:relative;width:100%}
+  svg.edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:visible}
+  /* ===== camadas (linhas horizontais) — SEM caixa agrupadora, pra não esconder as conexões ===== */
+  .layers{position:relative;z-index:2;display:flex;flex-direction:column;gap:30px}
+  .layer{position:relative}
+  .layer[data-layer="frontoffice"]{--accent:var(--z-front)}
+  .layer[data-layer="boundary"]{--accent:var(--z-bound)}
+  .layer[data-layer="backoffice"]{--accent:var(--z-back)}
+  .layer[data-layer="integrations"]{--accent:var(--z-int)}
+  .layer.infra{margin-top:14px;padding-top:20px;border-top:1px dashed var(--line-2)}
+  .layer-label{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);
+    margin-bottom:12px;display:inline-flex;align-items:center;gap:10px}
+  .lnum{font-family:var(--mono);font-size:11px;font-weight:600;background:var(--accent);color:#fff;
+    min-width:22px;text-align:center;padding:2px 6px;border-radius:var(--r-sm)}
+  .layer-body{display:grid;grid-template-columns:repeat(auto-fill,minmax(224px,1fr));gap:14px;align-items:start}
+  .layer-body .node{margin-bottom:0}
+
+  .node{position:relative;background:var(--card);border:1px solid var(--line-2);border-radius:var(--r-lg);padding:14px;margin-bottom:14px;
+    cursor:pointer;transition:var(--fast) var(--ease);box-shadow:var(--sh-sm)}
+  .node:hover{transform:translateY(-1px);box-shadow:var(--sh-md)}
+  .node.dim{opacity:.26;filter:saturate(.4)}
+  .node.focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+  .node.hl{border-color:var(--accent)}
+  .node[data-status="todo"]{border-style:dashed}
+  .node[data-zone="frontoffice"]{--accent:var(--z-front)}
+  .node[data-zone="boundary"]{--accent:var(--z-bound)}
+  .node[data-zone="backoffice"]{--accent:var(--z-back)}
+  .node[data-zone="integrations"]{--accent:var(--z-int)}
+  .node[data-domain="clinical"]{--accent:var(--clinical)}
+  .node .nt{display:flex;align-items:flex-start;gap:10px;font-weight:600;font-size:14px;letter-spacing:-.01em}
+  .node .ntitle{padding-top:4px;line-height:1.25}
+  .node .ico{width:28px;height:28px;border-radius:var(--r-md);display:grid;place-items:center;font-size:14px;background:var(--accent);color:#fff;flex:none}
+  .node .meta-row{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-top:10px}
+  .node .tp{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+    padding:3px 8px;border-radius:var(--r-full);color:var(--n600);background:var(--n0);border:1px dashed var(--n400);white-space:nowrap}
+  .node .desc{color:var(--ink-2);font-size:12px;margin-top:7px}
+  .node .tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+  .node .tag{font-size:10.5px;color:var(--ink-2);background:var(--n50);border:1px solid var(--line);border-radius:var(--r-sm);padding:2px 6px}
+  .node .route{font-family:var(--mono);font-size:10.5px;color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,transparent);border-radius:var(--r-sm);padding:2px 6px}
+  .st{display:inline-flex;align-items:center;gap:5px;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+    padding:3px 8px;border-radius:var(--r-full);white-space:nowrap}
+  .st .sd{width:7px;height:7px;border-radius:var(--r-full)}
+  .st.prod{color:#0f7a3d;background:var(--success-l)} .st.prod .sd{background:var(--success)}
+  .st.partial{color:#8a5a06;background:var(--warning-l)} .st.partial .sd{background:var(--warning)}
+  .st.todo{color:var(--n600);background:var(--n100)} .st.todo .sd{background:var(--n400)}
+
+  .rail{position:relative;z-index:2;margin-top:26px;border-top:1px solid var(--line);padding-top:20px}
+  .rail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
+
+  .drawer{position:fixed;top:0;right:0;height:100%;width:390px;max-width:92vw;background:var(--card);border-left:1px solid var(--line-2);
+    box-shadow:var(--sh-lg);transform:translateX(100%);transition:var(--normal) var(--ease);z-index:40;overflow-y:auto}
+  .drawer.open{transform:none}
+  .drawer .dh{padding:22px 22px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--card);z-index:1}
+  .drawer .db{padding:18px 22px 44px}
+  .drawer h3{margin:0;font-size:17px;font-weight:700;display:flex;align-items:center;gap:11px;padding-right:34px}
+  .drawer .close{position:absolute;top:18px;right:16px}
+  .sec{margin-top:18px}
+  .sec h4{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);margin:0 0 9px;font-weight:700}
+  .sec ul{margin:0;padding-left:16px;color:var(--ink-2);font-size:13px}
+  .sec li{margin:5px 0}
+  .kv{display:flex;gap:10px;font-size:13px;padding:6px 0;border-bottom:1px solid var(--line)}
+  .kv b{color:var(--ink-3);font-weight:600;min-width:100px}
+  .kv span{color:var(--ink)}
+  .conn{display:flex;align-items:center;gap:9px;font-size:12.5px;padding:6px 0}
+  .conn .cd{width:8px;height:8px;border-radius:var(--r-full);flex:none}
+  .rule{display:flex;gap:9px;font-size:12.5px;color:var(--ink-2);padding:5px 0;align-items:flex-start}
+  .rule::before{content:"→";color:var(--brand);font-weight:700}
+
+  .lower{display:grid;grid-template-columns:1.35fr 1fr;gap:22px;margin-top:24px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-xl);padding:22px;box-shadow:var(--sh-sm)}
+  .card h2{font-size:15px;margin:0 0 4px;font-weight:700;letter-spacing:-.01em}
+  .card .cs{color:var(--ink-2);font-size:12.5px;margin:0 0 16px}
+  .flow{position:relative;padding-left:26px}
+  .flow::before{content:"";position:absolute;left:9px;top:4px;bottom:4px;width:2px;background:var(--line-2)}
+  .step{position:relative;padding:0 0 14px}
+  .step:last-child{padding-bottom:0}
+  .step .n{position:absolute;left:-26px;width:20px;height:20px;border-radius:var(--r-full);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;background:var(--brand)}
+  .step .who{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+  .step.f .n{background:var(--z-front)} .step.f .who{color:var(--z-front)}
+  .step.b .n{background:var(--z-back)} .step.b .who{color:var(--z-back)}
+  .step.x .n{background:var(--z-int)} .step.x .who{color:var(--z-int)}
+  .step.s .n{background:var(--info)} .step.s .who{color:var(--info)}
+  .step.m .n{background:var(--clinical)} .step.m .who{color:var(--clinical)}
+  .step .txt{font-size:13px;color:var(--ink);margin-top:1px}
+  .voc .row{display:grid;grid-template-columns:112px 1fr;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+  .voc .row:last-child{border-bottom:0}
+  .voc .t{font-weight:700;color:var(--brand)}
+  .voc .d{color:var(--ink-2)}
+
+  .legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:18px;padding:14px 4px 0;border-top:1px solid var(--line);font-size:11.5px;color:var(--ink-2)}
+  .legend .grp{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+  .legend .lt{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+  .legend .li{display:flex;align-items:center;gap:7px}
+  .legend .ln{width:22px;height:0;border-top:3px solid}
+  .legend .ln.read{border-color:var(--brand)}
+  .legend .ln.write{border-color:var(--error);border-top-style:dashed}
+  .legend .ln.eval{border-color:var(--info)}
+  .legend .ln.webhook{border-color:var(--warning);border-top-style:dashed}
+  .legend .ln.clinical{border-color:var(--clinical)}
+  .legend .ln.auth{border-color:var(--brand-dark)}
+  .legend .ln.data{border-color:var(--n400)}
+  .legend .ln.ext{border-color:var(--n600);border-top-style:dotted}
+  .legend .sd{width:9px;height:9px;border-radius:var(--r-full)}
+
+  .modal{position:fixed;inset:0;background:rgba(6,25,173,.28);display:none;place-items:center;z-index:60;padding:24px;backdrop-filter:blur(2px)}
+  .modal.open{display:grid}
+  .modal .box{background:var(--card);border:1px solid var(--line-2);border-radius:var(--r-xl);width:min(820px,96vw);max-height:86vh;display:flex;flex-direction:column;box-shadow:var(--sh-lg)}
+  .modal .mh{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
+  .modal .mh h3{margin:0;font-size:15px;font-weight:700}
+  .modal pre{margin:0;overflow:auto;padding:16px 20px;font-family:var(--mono);font-size:12px;line-height:1.6;color:var(--ink);flex:1;background:var(--n50)}
+  .modal .mf{padding:12px 20px;border-top:1px solid var(--line);display:flex;gap:9px;justify-content:flex-end}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;
+    padding:11px 20px;border-radius:var(--r-md);font-size:13px;font-weight:600;opacity:0;transition:var(--normal) var(--ease);z-index:80;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:28px;line-height:1.7}
+
+  @media(max-width:1024px){.lower{grid-template-columns:1fr}}
+  @media(max-width:820px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="logo">N</div>
+      <div>
+        <h1>NAWA — Arquitetura da Plataforma</h1>
+        <div class="sub">Saúde contínua · dois repositórios independentes, uma só fronteira de API</div>
+        <div class="meta" id="meta"></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="btnView">◧ Ver JSON</button>
+      <button class="primary" id="btnExport">↧ Exportar JSON</button>
+    </div>
+  </header>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="toolbar" id="filters">
+    <span class="tlabel">Camada</span>
+    <button class="chip" data-kind="all" data-val="all" aria-pressed="true">Tudo</button>
+    <button class="chip" data-kind="zone" data-val="frontoffice"><span class="dot"></span>Frontoffice</button>
+    <button class="chip" data-kind="zone" data-val="boundary"><span class="dot"></span>Fronteira</button>
+    <button class="chip" data-kind="zone" data-val="backoffice"><span class="dot"></span>Backoffice</button>
+    <button class="chip" data-kind="zone" data-val="integrations"><span class="dot"></span>Integrações</button>
+    <span class="sep"></span>
+    <span class="tlabel">Estado</span>
+    <button class="chip" data-kind="status" data-val="prod"><span class="dot"></span>Em produção</button>
+    <button class="chip" data-kind="status" data-val="partial"><span class="dot"></span>Parcial</button>
+    <button class="chip" data-kind="status" data-val="todo"><span class="dot"></span>A fazer</button>
+    <span class="sep"></span>
+    <span class="tlabel">Dependência</span>
+    <button class="chip" data-kind="dep" data-val="thirdparty"><span class="dot"></span>🔗 Depende de 3º</button>
+    <span class="hint">clique num bloco para ver conexões, comunicação e estado</span>
+  </div>
+
+  <div class="canvas">
+    <div class="board" id="board">
+      <svg class="edges" id="edges"></svg>
+      <div class="layers">
+        <section class="layer" data-layer="frontoffice">
+          <div class="layer-label"><span class="lnum">01</span>Frontoffice · apresenta</div>
+          <div class="layer-body" id="lay-front"></div>
+        </section>
+        <section class="layer" data-layer="boundary">
+          <div class="layer-label"><span class="lnum">02</span>Fronteira de APIs · o contrato entre os dois</div>
+          <div class="layer-body" id="lay-bound"></div>
+        </section>
+        <section class="layer" data-layer="backoffice">
+          <div class="layer-label"><span class="lnum">03</span>Backoffice · decide (fonte da verdade)</div>
+          <div class="layer-body" id="lay-back"></div>
+        </section>
+        <section class="layer infra" data-layer="integrations">
+          <div class="layer-label"><span class="lnum">∞</span>Infraestrutura & Integrações — fornecedores, dados, fulfillment</div>
+          <div class="layer-body" id="lay-int"></div>
+        </section>
+      </div>
+    </div>
+    <div class="legend" id="legend">
+      <div class="grp"><span class="lt">Comunicação</span>
+        <div class="li"><span class="ln read"></span> Leitura (catálogo, cacheável)</div>
+        <div class="li"><span class="ln write"></span> Escrita (checkout, idempotente)</div>
+        <div class="li"><span class="ln eval"></span> Avaliação (anamnese)</div>
+        <div class="li"><span class="ln auth"></span> Sessão do paciente</div>
+        <div class="li"><span class="ln clinical"></span> Clínico (prescrição)</div>
+        <div class="li"><span class="ln webhook"></span> Webhook (assíncrono)</div>
+        <div class="li"><span class="ln data"></span> Dados</div>
+        <div class="li"><span class="ln ext"></span> Serviço externo</div>
+      </div>
+      <span class="sep"></span>
+      <div class="grp"><span class="lt">Estado</span>
+        <div class="li"><span class="sd" style="background:var(--success)"></span> Em produção</div>
+        <div class="li"><span class="sd" style="background:var(--warning)"></span> Parcial</div>
+        <div class="li"><span class="sd" style="background:var(--n400)"></span> A fazer</div>
+      </div>
+      <span class="sep"></span>
+      <div class="grp"><span class="lt">Dependência</span>
+        <div class="li">🔗 Depende de terceiro (fornecedor externo)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="lower">
+    <div class="card">
+      <h2>Fluxo do pedido & fulfillment — ponta a ponta</h2>
+      <p class="cs">Da anamnese ao pedido pago, produzido, enviado e rastreado — vivo na recorrência (spec §7).</p>
+      <div class="flow" id="flow"></div>
+    </div>
+    <div class="card">
+      <h2>Vocabulário compartilhado</h2>
+      <p class="cs">Os dois repos usam os mesmos nomes (spec §5). Sinônimo local é o começo da divergência.</p>
+      <div class="voc" id="voc"></div>
+    </div>
+  </div>
+
+  <footer id="foot"></footer>
+</div>
+
+<div class="drawer" id="drawer">
+  <div class="dh">
+    <h3 id="dTitle"></h3>
+    <button class="close" id="dClose">✕</button>
+    <div id="dSub" style="color:var(--ink-2);font-size:12.5px;margin-top:6px"></div>
+  </div>
+  <div class="db" id="dBody"></div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="box">
+    <div class="mh"><h3>Modelo de arquitetura (JSON)</h3><button id="mClose">✕</button></div>
+    <pre id="jsonOut"></pre>
+    <div class="mf">
+      <button id="btnCopy">⧉ Copiar</button>
+      <button class="primary" id="btnDl">↧ Baixar .json</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================================
+   MODELO ÚNICO DA ARQUITETURA — o diagrama é renderizado a partir daqui, e
+   "Exportar JSON" entrega este objeto. `status` reflete o que está de fato
+   desenvolvido (prod | partial | todo), com base nos plans dos dois repos.
+   Fonte: nawa/.spec/spec.md · ds/design.md · {backoffice,frontoffice}/.spec/*
+   ========================================================================= */
+const ARCH = {
+  meta:{
+    produto:"NAWA Health", tagline:"Saúde contínua.",
+    resumo:"Comércio eletrônico com inteligência na entrada: curadoria de itens prontos, anamnese que monta a composição, relação recorrente.",
+    regraDeOuro:"O backoffice decide. O frontoffice apresenta.",
+    atualizado:"2026-09-02 · ENDURECIMENTO PÓS-AUDITORIA em produção: validação de ambiente (zod, derruba o build se faltar configuração crítica), rate limit nas rotas de escrita, headers de segurança, CI com quatro portões, 48 testes e smoke pós-deploy. Auditoria de 01/09 fechou 3 achados críticos — a produção rodava o provedor de pagamento simulado e o webhook aceitava um segredo público. Pagar.me sandbox configurado com auth_only; FALTA cadastrar o webhook no painel deles. Frete com tarifa fixa ativa. Medido: aplicação satura em ~2.000 req/s; banco custa 40× o runtime",
+    designSystem:"NAWA DS — Azul #204FF1, Poppins (suporte da AT Aero), light-first, cor só quando carrega significado",
+    fonte:"nawa/.spec/spec.md · ds/design.md · backoffice/.spec/{plan,storefront-api}.md · frontoffice/.spec/{plan,api-boundary}.md"
+  },
+  statusLegenda:{ prod:"Em produção", partial:"Parcial", todo:"A fazer" },
+  stack:{
+    framework:"Next.js 15 (App Router)", ui:"React 19 · MUI v6 · Design System NAWA",
+    linguagem:"TypeScript 5", banco:"Supabase (Postgres + Auth + RLS)", deploy:"Netlify",
+    pagamento:"Pagar.me", fiscal:"eNotas", crm:"Hubspot", frete:"a definir (Correios / Melhor Envio / transportadora)"
+  },
+  nodes:[
+    /* ---------------- FRONTOFFICE ---------------- */
+    {id:"fo-catalog", zone:"frontoffice", icon:"🛍️", title:"Catálogo (vitrine)", badge:"/", status:"prod",
+     statusNote:"Home, protocolo, item e coleção construídos em dados reais.",
+     desc:"Vitrine, protocolos, itens, coleções e anamnese. Server Components lendo a Storefront API.",
+     tags:["/","/protocols/[slug]","/items/[slug]","/collections/[slug]"],
+     detail:{papel:"Superfície pública de descoberta",
+       features:["Home: coleções + protocolos + itens","Página de protocolo (kit) e de item (SKU)","Galeria de imagens (next/image)","Render da anamnese (avaliação é do backoffice)"]}},
+    {id:"fo-checkout", zone:"frontoffice", icon:"🧾", title:"Checkout", badge:"/checkout", status:"prod",
+     statusNote:"Fluxo em 3 blocos (Dados pessoais → Entrega → Pagamento) numa página só, com Resumo do pedido fixo. Carrinho, fechamento (guest→conta → pedido) e COBRANÇA são reais: o cartão é tokenizado no navegador e o backoffice cobra pelo Pagar.me; o PIX devolve o copia-e-cola na tela. O aviso de validação clínica aparece antes do pagamento. CASCA restante: só a cotação de frete, que é mock até a tabela dos Correios chegar.",
+     desc:"3 blocos: Dados → Entrega → Pagamento, resumo fixo. Superfície de escrita, a mais sensível.",
+     tags:["dados pessoais","entrega + frete","pagamento (PIX/cartão)","resumo do pedido"],
+     detail:{papel:"Fechamento do pedido — fluxo 3 blocos (ref. FARM RIO)",
+       features:["Bloco 1 Dados pessoais: e-mail, nome, CPF, telefone (guest→conta real)","Bloco 2 Entrega: CEP → endereço → forma de entrega (cotação MOCK; falta a tabela dos Correios)","Bloco 3 Pagamento: PIX (copia-e-cola) ou cartão tokenizado no navegador — o número do cartão nunca toca a NAWA","Ordem do fechamento: tokeniza → cria o pedido → cobra (cartão inválido não deixa pedido órfão)","Aviso de validação clínica ANTES do pagamento (exigência regulatória)","Resumo do pedido fixo: subtotal + entrega + total","Envia IDs + quantidades + endereço + token (nunca preço); idempotente por fechamento"]}},
+    {id:"fo-account", zone:"frontoffice", icon:"👤", title:"Painel do paciente", badge:"/account", status:"prod",
+     statusNote:"✅ Login + painel construídos e testados: pedidos, assinatura, perfil; detalhe do pedido com linha do tempo de status traduzida (§8).",
+     desc:"Área logada: pedidos, assinatura, histórico e rastreio de entrega.",
+     tags:["pedidos","assinatura","rastreio"],
+     detail:{papel:"Relação contínua com o paciente",
+       features:["Leitura autenticada, escopo próprio","Rastreio do pedido (código da transportadora)","Traduz estado interno → linguagem do paciente (spec §8)","Auth do paciente (contexto separado do admin)"]}},
+
+    /* ---------------- FRONTEIRA / API ---------------- */
+    {id:"api-catalog", zone:"boundary", icon:"📖", title:"Storefront API", badge:"read", status:"prod", kind:"read",
+     statusNote:"✅ Em produção, versionada em /api/storefront/v1/* (rotas sem versão viram alias retrocompatível). Fail-closed verificado.",
+     desc:"O contrato de leitura pública: itens, protocolos, coleções e anamnese publicados. Chave de API, cacheável na borda.",
+     tags:["GET /api/storefront/items","/protocols","/collections","/anamnesis"],
+     detail:{papel:"A Storefront — camada de API: o contrato de leitura entre backoffice e front",
+       comunicacao:{método:"GET",auth:"Chave de API (Bearer / x-api-key), escopo read",cache:"Borda: s-maxage=60, swr=300 + purge-on-publish",versao:"v1 — /api/storefront/v1/* (rotas sem versão = alias retrocompatível)"},
+       regras:["Serve o que os módulos do backoffice publicam (via Supabase)","Só status=published E visibility=public","medical_only NUNCA vaza (fail-closed), nem no rollup","Nunca trafega: cost, external_ref, claim_internal, supplier_id"]}},
+    {id:"api-checkout", zone:"boundary", icon:"🔒", title:"API Checkout", badge:"write", status:"prod", kind:"write",
+     statusNote:"POST /api/checkout/v1/orders construído e testado: guest→conta, revalida o carrinho, recalcula server-side, cria o pedido 'aguardando pagamento', idempotente. POST /api/checkout/v1/pay cobra pelo provedor configurado (stub ou Pagar.me), recebendo o token do cartão — nunca o número. Falta validar em sandbox.",
+     desc:"Escrita de pedido e cobrança. Sessão do paciente, idempotente, não cacheável.",
+     tags:["POST /api/checkout/v1/orders","POST /api/checkout/v1/pay"],
+     detail:{papel:"Superfície nova e mais sensível do produto",
+       comunicacao:{método:"POST /api/checkout/v1/{orders,pay}",auth:"Sessão do paciente (JWT); guest→conta cria o paciente se não existir",idempotência:"Carrinho converte uma vez (active→converted); repetir dá cart_already_converted. Pedido já pago não cobra de novo",cache:"Nunca",cobranca:"Pagar.me pela porta de pagamento — o front manda o token do cartão, o backoffice cobra server-side"},
+       regras:["Front envia IDs + quantidades + endereço; nunca preços","Backoffice recalcula preço e frete server-side","Revalidação no fechamento (publicado? preço mudou?)","Pagamento tokenizado no cliente; backoffice cobra"]}},
+    {id:"api-patient", zone:"boundary", icon:"🪪", title:"API Painel", badge:"auth", status:"prod", kind:"auth",
+     statusNote:"✅ GET /api/patient/{orders,subscriptions,profile} construído e testado. Valida JWT do paciente, escopo por auth_user_id no servidor.",
+     desc:"Leitura autenticada do próprio paciente. Escopo garantido no servidor.",
+     tags:["GET /api/patient/orders","/subscriptions","/profile"],
+     detail:{papel:"Dado do paciente, escopo restrito",
+       comunicacao:{método:"GET /api/patient/{orders,subscriptions,profile}",auth:"JWT do paciente (validado no backoffice)",escopo:"Próprio paciente por auth_user_id (no servidor, não por parâmetro)",cache:"Nunca na borda"},
+       regras:["Um paciente nunca acessa dado de outro","A identidade vem da sessão, não do cliente","Inclui status de entrega/rastreio traduzido"]}},
+    {id:"api-anamnesis", zone:"boundary", icon:"📝", title:"API Anamnese", badge:"avaliação", status:"prod", kind:"eval",
+     statusNote:"✅ POST /api/anamnesis/evaluate construído e testado (score + recomendação → carrinho). Regra de recomendação ainda é placeholder.",
+     desc:"Front envia respostas; backoffice avalia (score, condicional) e devolve a recomendação — o carrinho.",
+     tags:["POST /api/anamnesis/evaluate"],
+     detail:{papel:"Anamnese → recomendação (a lógica é do backoffice, spec §7)",
+       comunicacao:{método:"POST /api/anamnesis/evaluate",auth:"Sessão guest (decidido §11: anônima na anamnese, conta no checkout)",cache:"Nunca",retorno:"Score + recomendação já materializada como carrinho"},
+       regras:["Front só renderiza; score/condicional/recomendação no backoffice","Respostas são dado clínico — sessão inclinada a servidor","É o passo que origina o carrinho, antes do checkout"]}},
+    {id:"api-search", zone:"boundary", icon:"🔎", title:"API Busca & Índice", badge:"read", status:"prod", kind:"read",
+     statusNote:"✅ GET /api/storefront/search construído e testado. Postgres pg_trgm+unaccent (acento-insensível), fail-closed; paginação em /items. Falta filtros/SEO.",
+     desc:"Busca, paginação e filtros do catálogo. Índice (Postgres tsvector ou serviço externo) alimentado no publish.",
+     tags:["GET /api/storefront/search","paginação","filtros"],
+     detail:{papel:"Navegação e busca em escala",
+       comunicacao:{método:"GET",auth:"Chave de API, escopo read",cache:"Borda (como o catálogo)"},
+       regras:["Índice alimentado por evento de publish","Paginação/filtros no servidor (não tudo-de-uma-vez)","Slugs canônicos + sitemap para SEO"]}},
+
+    /* ---------------- BACKOFFICE ---------------- */
+    {id:"bo-storefront", zone:"backoffice", icon:"🎫", title:"Storefront · Chaves & Publicação", badge:"/api-keys", status:"prod",
+     statusNote:"Chaves e purge-on-publish em produção.",
+     desc:"O controle da Storefront no backoffice: gera/rotaciona chaves de API e purga o cache quando algo é publicado. NÃO serve dado — controla.",
+     tags:["chaves de API","publish → purge","fail-closed"],
+     detail:{papel:"A Storefront — plano de controle (acesso + frescor), no backoffice",
+       features:["Chaves de API: gerar, rotacionar, revogar (hash, last_used_at)","Publicar dispara purge-on-publish (cache tags)","Define a regra fail-closed do medical_only (aplicada na Storefront API)","É o /api-keys do admin — controle, não os dados"]}},
+    {id:"bo-catalog", zone:"backoffice", icon:"📦", title:"Catálogo · Protocolos · Coleções", badge:"v2", status:"prod",
+     statusNote:"Refatoração v2 em produção. Imagens de protocolo/coleção e auditoria (Fase 5) pendentes.",
+     desc:"Catálogo único de SKUs curados, kits (protocolos) e coleções comerciais.",
+     tags:["/catalog","/protocols","/collections","publish model"],
+     detail:{papel:"Curadoria — a PI da NAWA",
+       features:["Itens (SKU): fornecedor, preço, visibilidade, margem","Protocolos (kit): itens N↔N, claim aprovado, página editorial","Coleções: árvore parent_id + rollup, sustenta o Metabolic Reset","medical_only força trava; publicar exige preço"]}},
+    {id:"bo-anamnesis", zone:"backoffice", icon:"🧠", title:"Anamnese", badge:"form builder", status:"prod",
+     statusNote:"Construtor pronto. Geração de perfil/recomendação p/ o front é fase seguinte.",
+     desc:"Construtor de questionário com lógica condicional e score de risco.",
+     tags:["/anamnesis","condicional","score"],
+     detail:{papel:"Transforma pessoa+problema em composição",
+       features:["Tipos de pergunta, opções, obrigatoriedade, reordenação","Lógica condicional e peso de risco","Avaliação/score/recomendação vivem AQUI (não no front)"]}},
+    {id:"bo-orders", zone:"backoffice", icon:"📃", title:"Pedidos & Dashboard", badge:"operação", status:"prod",
+     statusNote:"Em dados reais. Migração p/ order_lines (Fase 5), cobrança e frete reais pendentes.",
+     desc:"Pedidos em dados reais, métricas (MRR, funil), fulfillment e alertas.",
+     tags:["/orders","/dashboard","order_lines"],
+     detail:{papel:"Operação, receita e fulfillment",
+       features:["Pedido = carrinho fechado e pago (linhas item|protocolo)","Revalida, calcula preço e frete, cobra e cria o pedido","Fulfillment: boletagem → produção (Botane) → frete/envio → rastreio","Dashboard: receita, ticket, pedidos, funil"]}},
+    {id:"bo-patients", zone:"backoffice", icon:"🩺", title:"Pacientes & Assinaturas", badge:"operação", status:"prod",
+     statusNote:"Ficha 360º e operações de assinatura em dados reais.",
+     desc:"Ficha 360º do paciente e recorrência (pausar, retentar, trocar plano).",
+     tags:["/patients","/subscriptions"],
+     detail:{papel:"Relação recorrente",
+       features:["Ficha 360º: cadastro, assinaturas, histórico, status clínico","Assinatura = recorrência de uma composição","Operações: pausar/reativar/retentar/cancelar/mudar plano"]}},
+    {id:"bo-system", zone:"backoffice", icon:"⚙️", title:"Sistema (RBAC · Auditoria · Promoções)", badge:"governança", status:"prod",
+     statusNote:"RBAC, trilha de auditoria e cupons prontos. Validação de cupom no checkout pendente.",
+     desc:"Papéis e usuários, trilha imutável (LGPD) e cupons.",
+     tags:["/settings","/audit","/promotions","RLS"],
+     detail:{papel:"Governança e conformidade",
+       features:["RBAC: super_admin · catalog_admin · doctor · operator","Auditoria: trilha imutável (ator, ação, entidade, IP, hora)","Promoções: cupons (validação no checkout, server-side — a fazer)","RLS em todas as tabelas; funções de papel stable"]}},
+    {id:"bo-medical", zone:"backoffice", domain:"clinical", icon:"🩺", title:"Área médica (Médico)", badge:"clínico", status:"todo",
+     statusNote:"Não construído. Onde vive é decisão em aberto (§11): perfil no front, no backoffice, ou 3º app.",
+     desc:"Fila de casos, revisão clínica, emissão e assinatura da prescrição. Papel doctor.",
+     tags:["fila de casos","revisão","doctor"],
+     detail:{papel:"Portão clínico — o médico não é cliente nem time interno (§11)",
+       features:["Revisa a recomendação da anamnese para itens de uso médico","Emite e assina a prescrição","Papel doctor já existe no RBAC (só o enum, sem UI)","Gate do GLP-1 / medicamento antes do fulfillment"]}},
+    {id:"bo-prescription", zone:"backoffice", domain:"clinical", icon:"💊", title:"Prescrição", badge:"clínico", status:"todo",
+     statusNote:"Não construído. prescription_id já existe no pedido; falta o módulo.",
+     desc:"Blocos de prescrição, prescription_id no pedido, integridade (não editável após emissão).",
+     tags:["prescription blocks","prescription_id","GLP-1"],
+     detail:{papel:"Receita que habilita a dispensa de item de uso médico",
+       features:["Prescription blocks configuráveis","prescription_id liga a receita ao pedido","Integridade: não editável após emissão","Ponte GLP-1: magistral (Botane) × original (parceiro)"]}},
+    {id:"bo-content", zone:"backoffice", icon:"📰", title:"Conteúdo (headless)", badge:"CMS", status:"todo",
+     statusNote:"Módulo futuro (plan Fase 3). Servido pela Storefront, como o catálogo.",
+     desc:"Landing, artigos clínicos e conteúdo editorial, publicados e servidos ao front.",
+     tags:["landing","artigos","publish model"],
+     detail:{papel:"Conteúdo editorial headless",
+       features:["Segue o mesmo publish model do catálogo","Servido pela Storefront (cache de borda)","Base para SEO e educação do paciente"]}},
+
+    /* ---------------- INTEGRAÇÕES / INFRA ---------------- */
+    {id:"bd-supabase", zone:"integrations", icon:"🐘", title:"Supabase", badge:"dados", status:"prod",
+     statusNote:"Postgres + Auth + RLS + Storage em uso pelo backoffice.",
+     desc:"Postgres + Auth + RLS + Storage (bucket catalog). Acessado só pelo backoffice.",
+     tags:["Postgres","Auth","RLS","Storage"],
+     detail:{papel:"Fonte de dados única",
+       features:["Auth: contextos separados admin ↔ paciente","RLS por papel (super_admin vê tudo)","Storage: imagens do catálogo (bucket público)","O frontoffice NUNCA acessa direto"]}},
+    {id:"bd-storefront", zone:"integrations", icon:"🌐", title:"Storefront · Cache de borda", badge:"CDN", status:"prod",
+     statusNote:"Cache de borda + purge-on-publish ativos. ✅ Coordenação de purge ponta a ponta ATIVA em prod (backoffice notifica o front via /api/revalidate + segredo compartilhado — envs setados em 2026-08-10).",
+     desc:"O CDN que cacheia as respostas da Storefront API. Absorve o tráfego — a maioria dos acessos nem toca o banco.",
+     tags:["edge cache","s-maxage=60","swr=300"],
+     detail:{papel:"A Storefront — cache de borda (infra): nem a API, nem o controle",
+       features:["s-maxage=60 + stale-while-revalidate=300","Invalidação por evento de publish (não por tempo)","Front também cacheia (revalidate + tag)","Cacheia a Storefront API; é servido pela Netlify"]}},
+    {id:"pt-auth", zone:"integrations", icon:"🔑", title:"Auth do paciente", badge:"sessão", status:"prod", kind:"auth",
+     statusNote:"✅ Supabase Auth (contexto do paciente) no front + validação de JWT no backoffice. Login/logout testados. Vínculo guest→conta agora nasce no CHECKOUT (o paciente é criado ao fechar o pedido).",
+     desc:"Sessão do paciente para checkout e painel. Antes ou depois da anamnese é decisão em aberto (§11).",
+     tags:["Supabase Auth","contexto paciente"],
+     detail:{papel:"Identidade do paciente",
+       features:["Contexto separado do admin (mesmo Supabase Auth)","Habilita checkout (escrita) e painel (leitura própria)","Sessão antes da compra: atrito × dado órfão (decisão §11)"]}},
+    {id:"cart", zone:"integrations", icon:"🛒", title:"Carrinho (persistência)", badge:"sessão", status:"prod", kind:"data",
+     statusNote:"✅ Servidor (decidido). Tabelas carts/cart_lines com hash âncora p/ abandono + email/patient_id. GET/PATCH testados.",
+     desc:"Onde o carrinho vive entre a anamnese e o checkout. Origem = anamnese; consumo = checkout.",
+     tags:["servidor vs cliente","origem: anamnese"],
+     detail:{papel:"Estado do carrinho",
+       features:["Anamnese monta o carrinho → precisa sobreviver troca de dispositivo","Se no servidor, exige sessão antes do checkout","Inclinação a servidor porque a anamnese é dado clínico"]}},
+    {id:"bx-pagarme", zone:"integrations", icon:"💳", title:"Pagar.me", badge:"pagamento", status:"partial", kind:"ext",
+     statusNote:"Adaptador REAL construído (pagarme.ts, API Core v5) na mesma porta do stub: cria a cobrança (PIX/cartão/boleto), relê o estado, captura autorização pendente e recebe webhook. O cartão é tokenizado no navegador contra a chave pública. Só falta validar em sandbox — as chaves de teste chegaram em 14/08. Trocar de provedor continua sendo uma variável de ambiente.",
+     desc:"Tokenização no navegador; cobrança server-side pelo backoffice. Stub e Pagar.me na mesma porta.",
+     tags:["porta/adaptador","pagarme.ts (v5)","token no cliente","captura × pré-autorização","webhook"],
+     detail:{papel:"Cobrança",
+       features:["O número do cartão nunca toca o servidor da NAWA — o navegador troca por um token de uso único","Quem cobra é o backoffice, server-side, com a chave secreta","Pré-compra suportada: PAGARME_OPERATION=auth_only reserva o limite e captura só após a validação clínica","Dinheiro reservado NUNCA conta como pago — autorização pendente fica 'processando'","Guardamos o id da COBRANÇA (ch_…), que é o que o webhook referencia","Webhook autenticado por HTTP Basic (o v5 não assina o corpo) + idempotência (unique provider+ref)"]}},
+    {id:"bx-frete", zone:"integrations", icon:"🚚", title:"Frete / Transportadora", badge:"logística", status:"partial", kind:"ext",
+     statusNote:"Plugue pendente do bloco Entrega do checkout. Hoje a cotação é MOCK (2 opções ilustrativas). Provedor a definir (Correios / Melhor Envio / transportadora). Bloqueia o teste final do fulfillment.",
+     desc:"Cotação de frete no checkout, etiqueta e rastreio na expedição.",
+     tags:["cotação","etiqueta","rastreio"],
+     detail:{papel:"Entrega física — parte do fulfillment",
+       features:["Cotação de frete no checkout (por CEP)","Geração de etiqueta na expedição","Código de rastreio → painel do paciente","Roda junto com a produção (Botane) no fulfillment"]}},
+    {id:"bx-enotas", zone:"integrations", icon:"📑", title:"eNotas", badge:"fiscal", status:"todo", kind:"ext",
+     statusNote:"Não integrado. Responsável fiscal é decisão em aberto (spec §11).",
+     desc:"Emissão de nota fiscal no fechamento do pedido.",
+     tags:["NF-e"],
+     detail:{papel:"Emissão fiscal",
+       features:["Responsável fiscal — decisão em aberto (spec §11)","Afeta fechamento e conciliação"]}},
+    {id:"bx-hubspot", zone:"integrations", icon:"📣", title:"Hubspot", badge:"CRM", status:"todo", kind:"ext",
+     statusNote:"Não integrado. Notificações são fase seguinte.",
+     desc:"CRM e base para notificações (email/WhatsApp).",
+     tags:["CRM","notificações"],
+     detail:{papel:"Relacionamento",
+       features:["Integra a jornada do paciente","Notificações (fase seguinte)"]}},
+    {id:"bx-notify", zone:"integrations", icon:"🔔", title:"Notificações", badge:"email/WhatsApp", status:"todo", kind:"ext",
+     statusNote:"Módulo futuro (plan Fase 3). Dispara via Hubspot.",
+     desc:"Email/WhatsApp: confirmação de pedido, envio, cobrança e recorrência.",
+     tags:["email","WhatsApp"],
+     detail:{papel:"Comunicação transacional",
+       features:["Confirmação de pedido / envio / rastreio","Avisos de cobrança e recorrência","Integra o Hubspot"]}},
+    {id:"obs", zone:"integrations", icon:"📈", title:"Observabilidade", badge:"SLO/logs", status:"partial", kind:"ext",
+     statusNote:"Log estruturado por request na Storefront (path, keyId, status, ms, rateRemaining) + métrica 'servido do fallback' no front — entregues no endurecimento. Falta backend de métricas, SLO/alarme e dashboards.",
+     desc:"Hit-rate/latência da API, webhooks falhos, sync quebrado, taxa de servido-do-fallback.",
+     tags:["SLO","métricas","alertas"],
+     detail:{papel:"Saúde do sistema",
+       features:["Latência/SLO da superfície de Catálogo","Webhooks falhos e sync Botane quebrado","Taxa de 'servido do fallback' no front"]}},
+    {id:"bx-botane", zone:"integrations", icon:"🏭", title:"Botane / Fornecedores", badge:"supply", status:"todo", kind:"ext",
+     statusNote:"⚠️ DUAS APIs necessárias da Botane. (1) API de PRODUTOS (entrada): sincronizar catálogo/fórmulas/farmacotécnica p/ dentro da NAWA. (2) API de ENVIO DE PEDIDOS (saída): despachar o pedido pago p/ produção. A API pública atual da Botane é só analytics/leitura (Data Warehouse) — NÃO expõe envio de pedidos, e o pull de produtos exige uma API key que ainda não temos. /botane-sync é casca; base pronta (botane_sync_log, external_ref).",
+     desc:"Origem dos itens prontos (entrada) e produção do pedido (saída). Precisa da API de produtos e da API de envio de pedidos.",
+     tags:["API de produtos (entrada)","API de envio de pedidos (saída)","external_ref","API key pendente"],
+     detail:{papel:"Fornecimento e produção — 2 integrações a definir com a Botane",
+       features:["Entrada: API de PRODUTOS p/ sincronizar catálogo/fórmulas (precisa de API key)","Saída: API de ENVIO DE PEDIDOS p/ despachar o pedido à produção (não existe na API atual)","API pública atual = só leitura/analytics (DW); sem endpoint de pedido","Sem a API de envio, a saída fica manual (operador) no MVP"]}},
+    {id:"bx-esign", zone:"integrations", domain:"clinical", icon:"✍️", title:"Assinatura digital", badge:"e-sign", status:"todo", kind:"ext",
+     statusNote:"Não integrado. Provedor e lead time em aberto (decisões dos plans).",
+     desc:"Assinatura digital da prescrição pelo médico. Gate regulatório antes de dispensar.",
+     tags:["provedor a definir","lead time"],
+     detail:{papel:"Validade legal da prescrição",
+       features:["Assina a prescrição emitida pelo médico","Provedor a definir — lead time impacta o fulfillment","Passo regulatório antes de dispensar medicamento"]}},
+    {id:"bd-netlify", zone:"integrations", icon:"▲", title:"Netlify", badge:"deploy", status:"prod", kind:"ext",
+     statusNote:"Deploy dos dois repos em produção.",
+     desc:"Deploy (Next runtime) e CDN dos dois repositórios.",
+     tags:["deploy","CDN","functions"],
+     detail:{papel:"Hospedagem",
+       features:["Runtime Next dos dois repos","CDN da Storefront","Netlify Functions (endpoints)"]}}
+  ],
+  edges:[
+    {from:"fo-catalog", to:"api-catalog", kind:"read", label:"lê a Storefront API"},
+    {from:"bo-catalog", to:"api-catalog", kind:"data", label:"publica → a Storefront serve"},
+    {from:"bo-storefront", to:"api-catalog", kind:"auth", label:"chaves de API"},
+    {from:"fo-checkout", to:"api-checkout", kind:"write", label:"IDs+qtd+endereço+token"},
+    {from:"api-checkout", to:"bo-orders", kind:"write", label:"cria pedido"},
+    {from:"fo-account", to:"api-patient", kind:"auth", label:"sessão do paciente"},
+    {from:"api-patient", to:"bo-orders", kind:"auth", label:"pedidos + rastreio"},
+    {from:"api-patient", to:"bo-patients", kind:"auth", label:"assinaturas/perfil"},
+    {from:"bo-storefront", to:"bd-storefront", kind:"ext", label:"purge-on-publish"},
+    {from:"api-catalog", to:"bd-storefront", kind:"read", label:"respostas cacheadas na borda"},
+    {from:"api-catalog", to:"bd-supabase", kind:"data", label:"lê só published+public"},
+    {from:"bo-catalog", to:"bd-supabase", kind:"data", label:"publica (draft→published)"},
+    {from:"bo-anamnesis", to:"bd-supabase", kind:"data"},
+    {from:"bo-orders", to:"bd-supabase", kind:"data"},
+    {from:"bo-patients", to:"bd-supabase", kind:"data"},
+    {from:"bo-system", to:"bd-supabase", kind:"data"},
+    {from:"bo-orders", to:"bx-pagarme", kind:"ext", label:"cobrança"},
+    {from:"bo-orders", to:"bx-frete", kind:"ext", label:"frete / envio"},
+    {from:"bo-orders", to:"bx-enotas", kind:"ext", label:"nota fiscal"},
+    {from:"bo-orders", to:"bx-botane", kind:"ext", label:"envio de pedidos (saída) — API a definir"},
+    {from:"bo-catalog", to:"bx-botane", kind:"ext", label:"API de produtos (entrada) — key pendente"},
+    {from:"bo-patients", to:"bx-hubspot", kind:"ext", label:"CRM"},
+    {from:"fo-catalog", to:"api-anamnesis", kind:"eval", label:"respostas da anamnese"},
+    {from:"api-anamnesis", to:"bo-anamnesis", kind:"eval", label:"avalia + recomenda"},
+    {from:"api-anamnesis", to:"cart", kind:"data", label:"monta o carrinho"},
+    {from:"cart", to:"fo-checkout", kind:"data", label:"carrinho → checkout"},
+    {from:"cart", to:"bd-supabase", kind:"data"},
+    {from:"fo-catalog", to:"api-search", kind:"read", label:"busca"},
+    {from:"api-search", to:"bd-supabase", kind:"data"},
+    {from:"pt-auth", to:"api-checkout", kind:"auth", label:"sessão"},
+    {from:"pt-auth", to:"api-patient", kind:"auth", label:"sessão"},
+    {from:"pt-auth", to:"bd-supabase", kind:"data"},
+    {from:"bo-content", to:"bd-supabase", kind:"data"},
+    {from:"bo-content", to:"api-catalog", kind:"data", label:"publica conteúdo"},
+    {from:"bo-orders", to:"bx-notify", kind:"ext", label:"confirmações"},
+    {from:"bx-notify", to:"bx-hubspot", kind:"ext", label:"via CRM"},
+    {from:"bx-pagarme", to:"bo-orders", kind:"webhook", label:"confirma pagamento"},
+    {from:"bx-botane", to:"bo-orders", kind:"webhook", label:"status de produção"},
+    {from:"bd-storefront", to:"obs", kind:"ext", label:"SLO / métricas"},
+    {from:"bo-anamnesis", to:"bo-medical", kind:"clinical", label:"caso clínico"},
+    {from:"bo-medical", to:"bo-prescription", kind:"clinical", label:"prescreve"},
+    {from:"bo-prescription", to:"bx-esign", kind:"clinical", label:"assina"},
+    {from:"bo-prescription", to:"bo-orders", kind:"clinical", label:"prescription_id"},
+    {from:"bo-prescription", to:"bx-botane", kind:"clinical", label:"GLP-1 magistral"},
+    {from:"bo-medical", to:"bd-supabase", kind:"data"},
+    {from:"bo-prescription", to:"bd-supabase", kind:"data"}
+  ],
+  fluxo:[
+    {n:1,who:"Frontoffice",cls:"f",txt:"Paciente entra pelo catálogo"},
+    {n:2,who:"Front + Back",cls:"b",txt:"Responde a anamnese (front renderiza, backoffice avalia)"},
+    {n:3,who:"Backoffice",cls:"b",txt:"Devolve a recomendação: protocolo base + upsells"},
+    {n:4,who:"Frontoffice",cls:"f",txt:"Ajusta o carrinho; frete é cotado no checkout (por CEP)"},
+    {n:5,who:"Frontoffice",cls:"f",txt:"Fechamento: envia IDs, quantidades, endereço e token"},
+    {n:6,who:"Backoffice",cls:"b",txt:"Revalida, calcula preço + frete, cobra pelo Pagar.me (PIX confirma por webhook), emite NF (eNotas), cria o pedido"},
+    {n:7,who:"Médico",cls:"m",txt:"Itens de uso médico: revisão clínica → prescrição → assinatura digital (gate do fulfillment). No modelo de pré-compra, é aqui que a cobrança autorizada vira captura"},
+    {n:8,who:"Operação",cls:"x",txt:"Boletagem e produção na Botane"},
+    {n:9,who:"Frete",cls:"s",txt:"Cálculo de frete, etiqueta e envio pela transportadora → código de rastreio"},
+    {n:10,who:"Frontoffice",cls:"f",txt:"Paciente acompanha status e rastreio pelo painel"},
+    {n:11,who:"Recorrência",cls:"b",txt:"Assinatura gera novos pedidos automaticamente"}
+  ],
+  vocabulario:[
+    {t:"Fornecedor",d:"Origem do item (Botane, parceiros, ou a própria NAWA)."},
+    {t:"Item",d:"Unidade vendável. Vem pronto, tem preço próprio, pode vender sozinho."},
+    {t:"Protocolo",d:"Kit curado pela NAWA. Onde está a propriedade intelectual."},
+    {t:"Coleção",d:"Categorização comercial, plana ou hierárquica (Metabolic Reset)."},
+    {t:"Storefront",d:"O caminho de leitura do publicado, em 3 facetas: a API (contrato, camada de APIs), Chaves & Publicação (controle, backoffice) e o Cache de borda (CDN, infra)."},
+    {t:"Anamnese",d:"Questionário com lógica condicional que recomenda a composição."},
+    {t:"Carrinho",d:"N protocolos + M itens avulsos. É o que a anamnese monta."},
+    {t:"Pedido",d:"Carrinho fechado e pago. Linhas de item ou protocolo."},
+    {t:"Fulfillment",d:"Produção (Botane), frete e entrega do pedido pago."},
+    {t:"Prescrição",d:"Receita assinada que habilita a dispensa de item de uso médico (GLP-1, medicamento)."},
+    {t:"Assinatura",d:"Recorrência de uma composição. Não existe catálogo de planos."}
+  ]
+};
+
+/* ========================= RENDER ========================= */
+const $ = (s,r=document)=>r.querySelector(s);
+const el=(t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;};
+const byId = Object.fromEntries(ARCH.nodes.map(n=>[n.id,n]));
+const ST = {prod:{l:"Em produção",c:"var(--success)"},partial:{l:"Parcial",c:"var(--warning)"},todo:{l:"A fazer",c:"var(--n400)"}};
+
+// Blocos que dependem de um fornecedor/serviço de TERCEIRO (contrato, SLA, integração externa).
+const THIRD_PARTY={
+  "fo-checkout":"Pagar.me — tokenização do cartão no navegador (chave pública)",
+  "api-checkout":"Pagar.me — cobrança server-side",
+  "bo-prescription":"Provedor de assinatura digital (e-sign)",
+  "bd-supabase":"Supabase (Postgres/Auth/Storage — BaaS)",
+  "bx-pagarme":"Pagar.me",
+  "bx-frete":"Correios / Melhor Envio / transportadora (a definir)",
+  "bx-esign":"Provedor de assinatura digital (a definir)",
+  "bx-enotas":"eNotas",
+  "bx-hubspot":"HubSpot",
+  "bx-notify":"Provedor de email/WhatsApp",
+  "bx-botane":"Botane + fornecedores parceiros",
+  "bd-netlify":"Netlify (hosting/CDN)"
+};
+ARCH.nodes.forEach(n=>{ if(THIRD_PARTY[n.id]) n.thirdParty=THIRD_PARTY[n.id]; });
+
+$("#meta").textContent = `${ARCH.stack.framework} · ${ARCH.stack.banco} · ${ARCH.stack.deploy}  —  atualizado ${ARCH.meta.atualizado}`;
+$("#foot").innerHTML = `<b>Regra de ouro:</b> ${ARCH.meta.regraDeOuro}<br>${ARCH.meta.designSystem}<br><span style="opacity:.8">${ARCH.meta.fonte}</span>`;
+
+(function(){
+  const counts={prod:0,partial:0,todo:0}; ARCH.nodes.forEach(n=>counts[n.status]++);
+  const tot=ARCH.nodes.length;
+  const s=$("#summary");
+  const seg=(k)=>`<i style="width:${(counts[k]/tot*100).toFixed(1)}%;background:${ST[k].c}"></i>`;
+  s.innerHTML =
+    `<div class="s"><span class="sd" style="background:var(--success)"></span><b>${counts.prod}</b> em produção</div>`+
+    `<div class="s"><span class="sd" style="background:var(--warning)"></span><b>${counts.partial}</b> parcial</div>`+
+    `<div class="s"><span class="sd" style="background:var(--n400)"></span><b>${counts.todo}</b> a fazer</div>`+
+    `<div class="bar">${seg('prod')}${seg('partial')}${seg('todo')}</div>`+
+    `<div class="s" style="color:var(--ink-3)">${counts.prod} de ${tot} blocos construídos</div>`;
+})();
+
+function nodeCard(n){
+  const routes = (n.tags||[]).map(t=>{
+    const isRoute = /^\/|^GET|^POST/.test(t);
+    return `<span class="${isRoute?'route':'tag'}">${t}</span>`;
+  }).join("");
+  const e = el("div","node");
+  e.dataset.zone=n.zone; e.dataset.id=n.id; e.dataset.status=n.status; if(n.domain) e.dataset.domain=n.domain; if(n.thirdParty) e.dataset.dep="1";
+  const st=ST[n.status];
+  const tp = n.thirdParty ? `<span class="tp" title="Depende de terceiro: ${n.thirdParty}">🔗 Terceiro</span>` : "";
+  e.innerHTML = `<div class="nt"><span class="ico">${n.icon}</span><span class="ntitle">${n.title}</span></div>
+      <div class="meta-row"><span class="st ${n.status}"><span class="sd"></span>${st.l}</span>${tp}</div>
+      <div class="desc">${n.desc}</div><div class="tags">${routes}</div>`;
+  e.addEventListener("click",()=>openDetail(n.id));
+  return e;
+}
+const LAYERS={frontoffice:"#lay-front",boundary:"#lay-bound",backoffice:"#lay-back",integrations:"#lay-int"};
+for(const [zone,sel] of Object.entries(LAYERS)){
+  const host=$(sel);
+  ARCH.nodes.filter(n=>n.zone===zone).forEach(n=>host.appendChild(nodeCard(n)));
+}
+
+const flow=$("#flow");
+ARCH.fluxo.forEach(s=>flow.appendChild(el("div","step "+s.cls,
+  `<div class="n">${s.n}</div><div class="who">${s.who}</div><div class="txt">${s.txt}</div>`)));
+const voc=$("#voc");
+ARCH.vocabulario.forEach(v=>voc.appendChild(el("div","row",`<div class="t">${v.t}</div><div class="d">${v.d}</div>`)));
+
+/* ========================= EDGES (SVG) ========================= */
+const svg=$("#edges"), board=$("#board");
+const EK={read:"var(--brand)",write:"var(--error)",eval:"var(--info)",auth:"var(--brand-dark)",webhook:"var(--warning)",clinical:"var(--clinical)",data:"var(--n400)",ext:"var(--n600)"};
+function drawEdges(focusId){
+  svg.innerHTML="";
+  const br=board.getBoundingClientRect();
+  ARCH.edges.forEach((e)=>{
+    const a=board.querySelector(`.node[data-id="${e.from}"]`), b=board.querySelector(`.node[data-id="${e.to}"]`);
+    if(!a||!b) return;
+    const involved = focusId && (e.from===focusId||e.to===focusId);
+    if(focusId && !involved) return;
+    const ra=a.getBoundingClientRect(), rb=b.getBoundingClientRect();
+    const ax=ra.left-br.left, ay=ra.top-br.top, bx=rb.left-br.left, by=rb.top-br.top;
+    const acx=ax+ra.width/2, acy=ay+ra.height/2, bcx=bx+rb.width/2, bcy=by+rb.height/2;
+    let x1,y1,x2,y2,c1x,c1y,c2x,c2y;
+    if(Math.abs(bcx-acx)>=Math.abs(bcy-acy)){
+      const dir=bcx>acx?1:-1;
+      x1=acx+dir*ra.width/2; y1=acy; x2=bcx-dir*rb.width/2; y2=bcy;
+      const dx=Math.abs(x2-x1)*.5; c1x=x1+dir*dx; c1y=y1; c2x=x2-dir*dx; c2y=y2;
+    }else{
+      const dir=bcy>acy?1:-1;
+      x1=acx; y1=acy+dir*ra.height/2; x2=bcx; y2=bcy-dir*rb.height/2;
+      const dy=Math.abs(y2-y1)*.5; c1x=x1; c1y=y1+dir*dy; c2x=x2; c2y=y2-dir*dy;
+    }
+    const col=EK[e.kind]||EK.data;
+    const p=document.createElementNS("http://www.w3.org/2000/svg","path");
+    p.setAttribute("d",`M${x1},${y1} C${c1x},${c1y} ${c2x},${c2y} ${x2},${y2}`);
+    p.setAttribute("fill","none"); p.setAttribute("stroke",col);
+    p.setAttribute("stroke-width", involved?2.6:1.6);
+    p.setAttribute("stroke-opacity", focusId? .95 : .45);
+    if(e.kind==="write") p.setAttribute("stroke-dasharray","6 4");
+    if(e.kind==="ext") p.setAttribute("stroke-dasharray","2 4");
+    if(e.kind==="webhook") p.setAttribute("stroke-dasharray","5 3 1 3");
+    svg.appendChild(p);
+    const ang=Math.atan2(y2-c2y,x2-c2x), s=6;
+    const ah=document.createElementNS("http://www.w3.org/2000/svg","path");
+    ah.setAttribute("d",`M${x2},${y2} L${x2-s*Math.cos(ang-.4)},${y2-s*Math.sin(ang-.4)} L${x2-s*Math.cos(ang+.4)},${y2-s*Math.sin(ang+.4)} Z`);
+    ah.setAttribute("fill",col); ah.setAttribute("fill-opacity", focusId?.95:.5);
+    svg.appendChild(ah);
+    if(focusId && involved && e.label){
+      const tx=(x1+x2)/2, ty=(y1+y2)/2-6;
+      const t=document.createElementNS("http://www.w3.org/2000/svg","text");
+      t.setAttribute("x",tx); t.setAttribute("y",ty); t.setAttribute("text-anchor","middle");
+      t.setAttribute("fill",col); t.setAttribute("font-size","10.5"); t.setAttribute("font-weight","700");
+      t.setAttribute("font-family","Poppins, sans-serif"); t.textContent=e.label;
+      svg.appendChild(t);
+    }
+  });
+}
+function connectedTo(id){
+  const s=new Set([id]);
+  ARCH.edges.forEach(e=>{ if(e.from===id)s.add(e.to); if(e.to===id)s.add(e.from); });
+  return s;
+}
+
+/* ========================= DRAWER ========================= */
+const drawer=$("#drawer");
+const zoneVar=z=>({frontoffice:"z-front",boundary:"z-bound",backoffice:"z-back",integrations:"z-int"}[z]);
+const zoneLabel=z=>({frontoffice:"Frontoffice (apresenta)",boundary:"Fronteira de API",backoffice:"Backoffice (decide)",integrations:"Integração / Infra"}[z]);
+function openDetail(id){
+  const n=byId[id]; if(!n) return;
+  board.querySelectorAll(".node").forEach(x=>x.classList.remove("focus","hl","dim"));
+  const conn=connectedTo(id);
+  board.querySelectorAll(".node").forEach(x=>{
+    if(x.dataset.id===id)x.classList.add("focus");
+    else if(conn.has(x.dataset.id))x.classList.add("hl");
+    else x.classList.add("dim");
+  });
+  drawEdges(id);
+  const st=ST[n.status];
+  $("#dTitle").innerHTML=`<span class="ico" style="width:28px;height:28px;border-radius:var(--r-md);display:inline-grid;place-items:center;background:var(--${zoneVar(n.zone)});color:#fff;font-size:14px">${n.icon}</span>${n.title}`;
+  $("#dSub").innerHTML=`<span class="st ${n.status}" style="margin:0"><span class="sd"></span>${st.l}</span> &nbsp; ${n.detail?.papel||""}`;
+  const d=n.detail||{}; let h="";
+  h+=`<div class="sec">`;
+  if(n.statusNote) h+=`<div class="kv"><b>Estado</b><span>${n.statusNote}</span></div>`;
+  if(n.thirdParty) h+=`<div class="kv"><b>Dependência 3º</b><span>🔗 ${n.thirdParty}</span></div>`;
+  h+=`<div class="kv"><b>Camada</b><span>${zoneLabel(n.zone)}</span></div>`;
+  if(n.badge)h+=`<div class="kv"><b>Tipo</b><span>${n.badge}</span></div></div>`; else h+=`</div>`;
+  if(d.comunicacao){
+    h+=`<div class="sec"><h4>Comunicação</h4>`;
+    for(const [k,v] of Object.entries(d.comunicacao)) h+=`<div class="kv"><b>${k}</b><span>${v}</span></div>`;
+    h+=`</div>`;
+  }
+  if(d.features){ h+=`<div class="sec"><h4>Funcionalidades</h4><ul>`+d.features.map(f=>`<li>${f}</li>`).join("")+`</ul></div>`; }
+  if(d.regras){ h+=`<div class="sec"><h4>Regras da fronteira</h4>`+d.regras.map(r=>`<div class="rule">${r}</div>`).join("")+`</div>`; }
+  const es=ARCH.edges.filter(e=>e.from===id||e.to===id);
+  if(es.length){
+    h+=`<div class="sec"><h4>Conexões (${es.length})</h4>`;
+    es.forEach(e=>{
+      const other=e.from===id? e.to : e.from, dir=e.from===id? "→" : "←";
+      h+=`<div class="conn"><span class="cd" style="background:${EK[e.kind]||EK.data}"></span>
+          <span><b style="color:var(--ink)">${dir}</b> ${byId[other]?.title||other}${e.label?` · <i style="color:var(--ink-3)">${e.label}</i>`:""}</span></div>`;
+    });
+    h+=`</div>`;
+  }
+  $("#dBody").innerHTML=h;
+  drawer.classList.add("open");
+}
+function closeDetail(){
+  drawer.classList.remove("open");
+  board.querySelectorAll(".node").forEach(x=>x.classList.remove("focus","hl","dim"));
+  applyFilter(curKind,curVal);
+}
+$("#dClose").addEventListener("click",closeDetail);
+
+/* ========================= FILTER (zona + estado) ========================= */
+let curKind="all", curVal="all";
+function nodeMatch(x,kind,val){
+  if(kind==="zone") return x.dataset.zone===val;
+  if(kind==="status") return x.dataset.status===val;
+  if(kind==="dep") return x.dataset.dep==="1";
+  return true;
+}
+function applyFilter(kind,val){
+  curKind=kind; curVal=val;
+  board.querySelectorAll(".node").forEach(x=>x.classList.remove("focus","hl","dim"));
+  if(kind==="all"){ drawEdges(null); }
+  else{
+    board.querySelectorAll(".node").forEach(x=> nodeMatch(x,kind,val) ? x.classList.remove("dim") : x.classList.add("dim"));
+    drawEdges(null);
+  }
+  $("#filters").querySelectorAll(".chip").forEach(c=>c.setAttribute("aria-pressed", c.dataset.kind===kind && c.dataset.val===val));
+}
+$("#filters").addEventListener("click",e=>{
+  const c=e.target.closest(".chip"); if(!c)return;
+  applyFilter(c.dataset.kind==="all"?"all":c.dataset.kind, c.dataset.val);
+});
+
+/* ========================= JSON EXPORT ========================= */
+const jsonStr=()=>JSON.stringify(ARCH,null,2);
+function download(){
+  const blob=new Blob([jsonStr()],{type:"application/json"});
+  const a=el("a"); a.href=URL.createObjectURL(blob); a.download="nawa-arquitetura.json";
+  document.body.appendChild(a); a.click(); a.remove(); toast("JSON baixado");
+}
+function copy(){ navigator.clipboard.writeText(jsonStr()).then(()=>toast("JSON copiado")); }
+$("#btnExport").addEventListener("click",download);
+$("#btnDl").addEventListener("click",download);
+$("#btnCopy").addEventListener("click",copy);
+$("#btnView").addEventListener("click",()=>{ $("#jsonOut").textContent=jsonStr(); $("#modal").classList.add("open"); });
+$("#mClose").addEventListener("click",()=>$("#modal").classList.remove("open"));
+$("#modal").addEventListener("click",e=>{ if(e.target.id==="modal")$("#modal").classList.remove("open"); });
+
+/* ========================= TOAST / RESIZE ========================= */
+let tt; function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("show"); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove("show"),1600); }
+let raf; function redraw(){ cancelAnimationFrame(raf); raf=requestAnimationFrame(()=>{ const f=$(".node.focus"); drawEdges(f?f.dataset.id:null); }); }
+window.addEventListener("resize",redraw);
+new ResizeObserver(redraw).observe(board);
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ closeDetail(); $("#modal").classList.remove("open"); }});
+document.fonts && document.fonts.ready.then(redraw);
+window.addEventListener("load",redraw);
+requestAnimationFrame(redraw);
+[120,350,700].forEach(t=>setTimeout(redraw,t)); // camadas mudam a altura do board no load
+</script>
+</body>
+</html>
